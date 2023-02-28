@@ -1,8 +1,6 @@
 import fabric
-import sys
 import logging
 import invoke
-
 
 def connect(ip_addr: str, username: str, key_path: str) -> fabric.Connection:
     """
@@ -26,7 +24,7 @@ def connect(ip_addr: str, username: str, key_path: str) -> fabric.Connection:
         c.open()  # Try opening the connection specified above
         c.close()  # Will not be executed if the connection can not be made
     except TimeoutError:  # Raised by c.open() if connect_timeout is reached
-        print("Connection to {} not established. Reason: timed out.".format(ip_addr), file=sys.stderr)
+        logging.exception("Connection to {} not established. Reason: timed out.".format(ip_addr))
         exit(1)
         # TODO - Is exit really the best behavior here?
     return c
