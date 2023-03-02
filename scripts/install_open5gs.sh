@@ -1,5 +1,5 @@
 #!/bin/bash
-
+# IMPORTANT NOTE: SCRIPT NOT TESTED!
 if [[ $EUID -ne 0 ]]; then
   echo "Root privileges needed"
   exit
@@ -7,7 +7,7 @@ fi
 # Fetching needed things for open5gs
 #echo "Fetching some dependencies for open5gs..."
 apt-get install software-properties-common -y
-add-apt-reposistory ppa:open5gs/latest -y
+add-apt-repository ppa:open5gs/latest -y
 #echo "OK"
 # Installing mongo db
 #echo "Fetching dependencies for mongodb..."
