@@ -1,7 +1,7 @@
 import fabric
 import logging
 import invoke
-
+import os
 
 def connect(ip_addr: str, *, username: str, key_path: str) -> fabric.Connection:
     """
@@ -33,7 +33,7 @@ def connect(ip_addr: str, *, username: str, key_path: str) -> fabric.Connection:
 
 def execute(target_con: fabric.Connection, *, command: str, sudo: bool = False) -> fabric.Result:
     """
-    Performs a command on a machine specified in the connection.
+    Performs a command on a machine specified in the connection. Can also be used to execute scripts.
     If sudo is true, the command will be executed as an elevated user.
     invoke.Unexpected exit is thrown by fabric.Connection.sudo or fabric.Connection.run
     if command execution returns an error code (if return_code is not 0)
@@ -64,34 +64,38 @@ def execute(target_con: fabric.Connection, *, command: str, sudo: bool = False) 
         return result
 
 
-def execute_script(target_con: fabric.Connection, *, script_name: str, sudo: bool = False):
+def transfer_file(target_con: fabric.Connection, *, local_path: str, permissions: str) -> str:
     """
-    Executes a script on the target machine. If the script does not exist on the target
-    The method will attempt to transfer the script from scripts folder to the target machine
-    script_name can be with or without .sh extension. Due to windows shenanigans, we need *.sh locally
+    Transfers a file found at file_path to the machine specified in target_con.
+    Due to harder implementation, sudo version of the method might not be implemented in the future
+    Permissions determines the permission on the target system. Should be of Linux format e.g. "700"
+    Returns the remote path of the file that was put. Returns empty string if transfer failed
     :param target_con: fabric.Connection
-    :param script_name: str
-    :param sudo: bool
+    :param local_path: str
+    :param permissions: str
+    :return: str
     """
-    # TODO - rename the method and change it's operation. For now it only transfers the script to the target machine
-    # We need .sh to properly address the script file on the local system
-    if script_name[-3:] != ".sh":
-        script_name += ".sh"
 
-    # Determine the absolute path. Root has different home folder than other users
+    # TODO - Is checking the correctness of permissions really necessary?
+    # Extract the file name
+    local_abspath = os.path.abspath(local_path)  # Get absolute path
+    dest_file_name = os.path.basename(local_abspath)
+    dest_file_name = dest_file_name.split(".")[0]
+    # Determine the target absolute path. Root has different home folder than other users
     if target_con.user == "root":
-        dest_path = "/root/" + script_name[:-3]
+        dest_path = "/root/{file_name}".format(file_name=dest_file_name)
     else:
-        dest_path = "/home/" + target_con.user + "/" + script_name[:-3]
-    print(dest_path)
+        dest_path = "/home/{user}/{file_name}".format(user=target_con.user, file_name=dest_file_name)
+
     try:
-        # Install the script by transferring it, and then using install command
-        target_con.put('C:\\Users\\batru\\Desktop\\system_commands_testing\\scripts\\write_something.sh', dest_path)
-        target_con.run('chmod +x ' + dest_path)
-    except OSError as e:  # Raised if local file does not exist
-        logging.exception("Error occured while transferring {}\nReason: {}".format(script, e))
-        return
-    return
+        # Transfer the file with put
+        target_con.put(local_path, dest_path)
+        target_con.run('chmod {perm} {path}'.format(perm=permissions, path=dest_path))
+    except (OSError, FileNotFoundError) as e:  # General error raised if transfer fails
+        logging.exception("Error occurred while transferring {}\nReason: {}".format(dest_file_name, e))
+        return ""
+    else:
+        return dest_path
 
 
 def install_open5gs(target_con: fabric.Connection):
@@ -109,11 +113,14 @@ def main():
     # Define necessary connection information
     ip_addr = "192.168.0.105"
     key_path = "C:\\Users\\batru\\Desktop\\Keys\\private_clean_ubuntu_20_clone"
-    c = connect(ip_addr, username="root", key_path=key_path)
+    c = connect(ip_addr, username="open5gs", key_path=key_path)
     print(c.user)
     # execute(c, command="echo $SHELL", sudo=False)
-    #execute_script(c, script="write_something")
-    execute_script2(c, script="write_something")
+    dest_path = transfer_file(c, local_path="scripts/install_open5gs.sh", permissions="700")
+    if len(dest_path) == 0:
+        print("File not transferred. Check log")
+    else:
+        print("File transferred to {}".format(dest_path))
 
 
 if __name__ == "__main__":
