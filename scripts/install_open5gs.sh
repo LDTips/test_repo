@@ -1,11 +1,18 @@
 #!/bin/bash
-# IMPORTANT NOTE: SCRIPT NOT TESTED!
+# Script is most likely operational. Fixed issue with mongod process persisting
 if [[ $EUID -ne 0 ]]; then
   echo "Root privileges needed"
+  echo "Aborting installation"
   exit
 fi
-# Fetching needed things for open5gs
-# Fetching some dependencies for open5gs
+
+if [[ -f "/bin/open5gs-amfd" ]]; then
+  echo "Open5gs is most likely installed. One of binaries present in /bin"
+  echo "Aborting installation"
+  exit
+fi
+
+# Fetching dependency for open5gs and adding repository
 apt-get install software-properties-common -y
 add-apt-repository ppa:open5gs/latest -y
 
@@ -18,15 +25,19 @@ echo "deb [ arch=amd64] https://repo.mongodb.org/apt/ubuntu focal/mongodb-org/4.
 apt-get update
 apt-get install -y mongodb-org
 
-sleep 3
-# Checking if mongodb works
+sleep 2  # Just in case mongo takes some time to launch
+# Checking if mongodb works.
 if pgrep -x "mongod" > /dev/null; then
   echo "Mongo daemon is running OK!"
 else
-  echo "Not working. Attempting to fix mongo daemon..."
+  echo "Mongo daemon is not working. Attempting to fix it..."
   mkdir -p /data/db  # or /usr/local/var/data/db - needs to be checked. Maybe dependent on mongo version
-  mongod
+  # Alternative if the restart stops working:
+  #mongod > /dev/null 2>&1 & # Run mongod in background; redirect stderr to stdout, and stdout to /dev/null
+  #sleep 2
+  #pkill mongod
   systemctl restart mongod
+  sleep 3
   if pgrep -x "mongod" > /dev/null; then
     echo "Fix successful! Mongo daemon is running"
   else
@@ -36,7 +47,7 @@ else
 fi
 
 # Finalise open5gs installation
-apt-get install open5gs
+apt-get install open5gs -y
 
 # Fetch cli interface for open5gs subscriber database
 wget https://raw.githubusercontent.com/open5gs/open5gs/main/misc/db/open5gs-dbctl -O /usr/bin/open5gs-dbctl
