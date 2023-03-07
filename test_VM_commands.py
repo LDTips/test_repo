@@ -99,15 +99,19 @@ def transfer_file(target_con: fabric.Connection, *, local_path: str, permissions
         return dest_path
 
 
-def get_file(target_con: fabric.connection, *, remote_path: str, folder_mode: bool = False) -> str:
+def get_file(target_con: fabric.connection, remote_path: str, dest_path: str = "", *,
+             folder_mode: bool = False) -> None:
     # NOTE. Get method is unable to fetch files into a directory:
     # target_con.get(remote_path, "./configs/nrf.yaml")  # e.g. when remote_path is /etc/open5gs/nrf.yaml - works
     # target_con.get(remote_path, "./")  # when remote_path is /etc/open5gs/ does not work, because:
     # PermissionError: [Errno 13] Permission denied: 'C:\\Users\\batru\\Desktop\\system_commands_testing\\configs'
     """
-    Transfers file from remote machine to local. If folder_mode is true, it will attempt to transfer whole folder
+    Transfers file from remote machine specified in target_con, to local filesystem.
+    If folder_mode is true, it will attempt to transfer whole folder
+    Dest_path is appended to the 'transfers' folder
     :param target_con: fabric.connection
     :param remote_path: str
+    :param dest_path: str
     :param folder_mode: bool
     :return: str
     """
@@ -116,40 +120,32 @@ def get_file(target_con: fabric.connection, *, remote_path: str, folder_mode: bo
     # Determine the directory contents
     if folder_mode:  # We need to fetch folder contents to transfer files one by one
         # Find only files (not folders) in the specified remote_path
-        file_list = target_con.run('find ' + remote_path + ' -maxdepth 1 -type f', hide=True)
+        file_list = execute(target_con, command='find {} -maxdepth 1 -type f'.format(remote_path))
         # Split each file path into different array indexes
         file_list = file_list.stdout.split()
         # Since find gives the full path, we need to extract only the file names
-        file_list = [file.split("/")[-1] for file in file_list]
-        # print(file_list)
-    return "test"
-
-
-def install_open5gs(target_con: fabric.Connection):
-    """
-    Executes necessary scripts and operations to install
-    Open5gs on the machine specified in the target_con
-    :param target_con: fabric.Connection
-    :return:
-    """
-    pass
+        file_names = [file.split("/")[-1] for file in file_list]
+        for file_path, file_name in zip(file_list, file_names):
+            target_con.get(file_path, "./transfers/{}/{}".format(dest_path, file_name))
+    else:
+        file_name = remote_path.split("/")[-1]
+        target_con.get(remote_path, "./transfers/{}/{}".format(dest_path, file_name))
 
 
 def main():
     logging.basicConfig(filename="test.log", level=logging.DEBUG)
     # Define necessary connection information
     ip_addr = "192.168.0.105"
-    key_path = "C:\\Users\\batru\\Desktop\\Keys\\private_clean_ubuntu_20_clone"
-    c = connect(ip_addr, username="root", key_path=key_path)
-    print(c.user)
+    key_path = r"C:\Users\batru\Desktop\Keys\private_clean_ubuntu_20_clone"
+    c = connect(ip_addr, username="open5gs", key_path=key_path)
     # execute(c, command="echo $SHELL", sudo=False)
-    # dest_path = transfer_file(c, local_path="scripts/install_open5gs.sh", permissions="700")
+    dest_path = transfer_file(c, local_path="scripts/install_UERANSIM.sh", permissions="700")
     # if len(dest_path) == 0:
     #     print("File not transferred. Check log")
     # else:
     #     print("File transferred to {}".format(dest_path))
 
-    get_file(c, remote_path="/etc/open5gs", folder_mode=True)
+    get_file(c, remote_path="/etc/open5gs/amf.yaml", dest_path="/some_folder", folder_mode=False)
 
 
 if __name__ == "__main__":
