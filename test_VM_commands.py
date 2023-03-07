@@ -3,6 +3,7 @@ import logging
 import invoke
 import os
 
+
 def connect(ip_addr: str, *, username: str, key_path: str) -> fabric.Connection:
     """
     Establishes and checks the possibility of an SSH connection with specified parameters.
@@ -98,6 +99,32 @@ def transfer_file(target_con: fabric.Connection, *, local_path: str, permissions
         return dest_path
 
 
+def get_file(target_con: fabric.connection, *, remote_path: str, folder_mode: bool = False) -> str:
+    # NOTE. Get method is unable to fetch files into a directory:
+    # target_con.get(remote_path, "./configs/nrf.yaml")  # e.g. when remote_path is /etc/open5gs/nrf.yaml - works
+    # target_con.get(remote_path, "./")  # when remote_path is /etc/open5gs/ does not work, because:
+    # PermissionError: [Errno 13] Permission denied: 'C:\\Users\\batru\\Desktop\\system_commands_testing\\configs'
+    """
+    Transfers file from remote machine to local. If folder_mode is true, it will attempt to transfer whole folder
+    :param target_con: fabric.connection
+    :param remote_path: str
+    :param folder_mode: bool
+    :return: str
+    """
+    # TODO - Determine why transferring whole folder does not work. Maybe it is just not possible?
+    # TODO - Implement this method, handle exceptions
+    # Determine the directory contents
+    if folder_mode:  # We need to fetch folder contents to transfer files one by one
+        # Find only files (not folders) in the specified remote_path
+        file_list = target_con.run('find ' + remote_path + ' -maxdepth 1 -type f', hide=True)
+        # Split each file path into different array indexes
+        file_list = file_list.stdout.split()
+        # Since find gives the full path, we need to extract only the file names
+        file_list = [file.split("/")[-1] for file in file_list]
+        # print(file_list)
+    return "test"
+
+
 def install_open5gs(target_con: fabric.Connection):
     """
     Executes necessary scripts and operations to install
@@ -109,18 +136,20 @@ def install_open5gs(target_con: fabric.Connection):
 
 
 def main():
-    logging.basicConfig(filename="test.log", level=logging.INFO)
+    logging.basicConfig(filename="test.log", level=logging.DEBUG)
     # Define necessary connection information
     ip_addr = "192.168.0.105"
     key_path = "C:\\Users\\batru\\Desktop\\Keys\\private_clean_ubuntu_20_clone"
-    c = connect(ip_addr, username="open5gs", key_path=key_path)
+    c = connect(ip_addr, username="root", key_path=key_path)
     print(c.user)
     # execute(c, command="echo $SHELL", sudo=False)
-    dest_path = transfer_file(c, local_path="scripts/install_open5gs.sh", permissions="700")
-    if len(dest_path) == 0:
-        print("File not transferred. Check log")
-    else:
-        print("File transferred to {}".format(dest_path))
+    # dest_path = transfer_file(c, local_path="scripts/install_open5gs.sh", permissions="700")
+    # if len(dest_path) == 0:
+    #     print("File not transferred. Check log")
+    # else:
+    #     print("File transferred to {}".format(dest_path))
+
+    get_file(c, remote_path="/etc/open5gs", folder_mode=True)
 
 
 if __name__ == "__main__":
