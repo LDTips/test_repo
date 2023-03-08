@@ -1,37 +1,11 @@
-import yaml
-
-
-def foo(yaml_parsed: dict) -> None:
-    """
-    Test function please ignore
-    :return: None
-    """
-    # TODO - Learn if the arrays from the loaded yamls are always one element only
-    # To avoid a situation where we end up with a list with single element
-    # if type(x) is list:
-    #     x = x[0]
-    # elif type(x) is dict:
-    #     x = x.get("next element")
-    # else:
-    #     print("error")
-    #
-    # print(type(yaml_parsed.get('amf').get('sbi')))
-    # print(type(yaml_parsed['amf']))
-    # print(type(yaml_parsed['amf']['guami']))
-    # print(yaml_parsed['amf']['guami'])
-    # print(type(yaml_parsed['amf']['guami'][0]))
-    # print(type(yaml_parsed['amf']['guami'][0]['plmn_id']))
-    # print(type(yaml_parsed['amf']['guami'][0]['plmn_id']['mcc']))
-    # print(yaml_parsed['amf']['guami'])
-    # print(yaml_parsed['amf']['guami'][0]['plmn_id']['mcc'])
-    pass
+import ruamel.yaml as yaml
 
 
 def read_yaml(file_path: str) -> dict:
     """
     Reads a yaml file specified in the file_path
     :param file_path: str
-    :return:
+    :return: dict
     """
     with open(file_path, 'r') as text:
         try:
@@ -44,9 +18,18 @@ def read_yaml(file_path: str) -> dict:
     return yaml_parsed
 
 
+def modify_amf(amf_dict: dict, new_values_dict: dict):
+    # Function for testing. Not final!
+    # sbi
+    diff_dict = amf_dict
+    diff_dict['amf']['sbi'][0]['addr'] = new_values_dict['sbi_addr']
+    return diff_dict
+
+
 def main():
-    yaml_data = read_yaml("./transfers/some_folder/learning.yaml")
-    foo(yaml_data)
+    yaml_data = read_yaml("./transfers/some_folder/amf.yaml")
+    yaml_data = modify_amf(yaml_data, {'sbi_addr': 1234})
+    print(yaml.dump(yaml_data))
 
 
 if __name__ == "__main__":
