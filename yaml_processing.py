@@ -52,20 +52,19 @@ def modify_yaml(src_dict: dict, new_values_dict: dict, file_type: str) -> dict:
     :param file_type: str
     :return: dict
     """
-    method_name = "driver_" + file_type
+    function_name = "driver_" + file_type
     # TODO - Rename 'function' into something more clever
     try:
-        function = getattr(driver_functions_yaml, method_name)  # Raises AttributeError if function does not exist
+        driver_fun = getattr(driver_functions_yaml, function_name)  # Raises AttributeError if function does not exist
     except AttributeError:
         logging.exception("Invalid file type passed. {} is not specified in driver functions".format(file_type))
-        return {}
+        return src_dict
 
     diff_dict = copy.deepcopy(src_dict)  # By default, python does a shallow cpy, which results in modifying amf_dict
     for key in new_values_dict:
         try:
-            diff_dict = function(key.split("-"), diff_dict, new_values_dict[key])
+            diff_dict = driver_fun(key.split("-"), diff_dict, new_values_dict[key])
         except KeyError:
-            # print("KeyError caught for {}".format(key))
             logging.exception("Key {} was not found in amf.yaml, but was passed in new_values dict".format(key))
 
     return diff_dict
@@ -117,18 +116,43 @@ def test_mme():
     print(yaml.dump(new_yaml_data))
 
 
+def test_nrf():
+    test_dict = {'sbi-addr-4': "11.11.11.11", 'sbi-addr-6': "::ff", 'sbi-port': 1234}
+    yaml_data = read_yaml("./transfers/all_open5gs/nrf.yaml")
+    new_yaml_data = modify_yaml(yaml_data, test_dict, "nrf")
+    print(yaml.dump(new_yaml_data))
+
+
+def test_nssf():
+    test_dict = {'sbi-addr': "11.11.11.11", 'sbi-port': 11, 'nsi-addr': "11.11.11.11", "nsi-port": 11,
+                 'nsi-s_nssai-sst': 11}
+    yaml_data = read_yaml("./transfers/all_open5gs/nssf.yaml")
+    new_yaml_data = modify_yaml(yaml_data, test_dict, "nssf")
+    print(yaml.dump(new_yaml_data))
+
+
 def main():
     logging.basicConfig(filename="processing_yaml.log", level=logging.INFO)
     # AMF testing section
     # test_amf()
+
     # AUSF testing section
     # test_ausf()
+
     # BSF testing section
     # test_bsf()
+
     # HSS testing section
     # test_hss()
+
     # MME testing section
-    test_mme()
+    # test_mme()
+
+    # NRF testing section
+    # test_nrf()
+
+    # NSSF testing section
+    # test_nssf()
 
 
 if __name__ == "__main__":
