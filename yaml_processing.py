@@ -2,7 +2,6 @@ import ruamel.yaml as yaml
 import logging
 import copy
 import os
-import typing
 import driver_functions_yaml
 
 
@@ -43,18 +42,23 @@ def write_yaml(file_path: str, yaml_data: dict, *, overwrite: bool = False) -> N
         logging.exception(e)
 
 
-def modify_yaml(src_dict: dict, new_values_dict: dict) -> dict:
+def modify_yaml(src_dict: dict, new_values_dict: dict, file_type: str) -> dict:
     """
-    Function modifies specified src_dict with values present in the new_values_dict
-    Using specified driver_function. Every yaml configuration file has different datastructure
-    Hence different driver functions should be used for different yaml files
+    Function creates a modified deep copy of src_dict with values present in the new_values_dict
+    Modification is done accordint to the passed file_type. Every config file of open5gs has different structure
     :param src_dict: dict
     :param new_values_dict: dict
+    :param file_type: str
     :return: dict
     """
-    # TODO - Determine how to get the config file name from the src_dict
-    method_name = "driver_" + "amf"
-    function = getattr(driver_functions_yaml, method_name)  # Raises AttributeError if function does not exist
+    method_name = "driver_" + file_type
+    # TODO - Rename 'function' into something more clever
+    try:
+        function = getattr(driver_functions_yaml, method_name)  # Raises AttributeError if function does not exist
+    except AttributeError:
+        logging.exception("Invalid file type passed. {} is not specified in driver functions".format(file_type))
+        return {}
+
     diff_dict = copy.deepcopy(src_dict)  # By default, python does a shallow cpy, which results in modifying amf_dict
     for key in new_values_dict:
         try:
@@ -76,14 +80,14 @@ def main():
                      'plmn_support-plmn_id-mcc': 111, 'plmn_support-plmn_id-mnc': 111, 'plmn_support-s_nssai-sst': 111,
                      'security-integrity_order': [111, 111, 111], 'security-ciphering_order': [111, 111, 111],
                      'network_name-full': "111111", "amf_name": "111111"}
-    new_yaml_data_amf = modify_yaml(yaml_data_amf, test_dict_amf)
+    new_yaml_data_amf = modify_yaml(yaml_data_amf, test_dict_amf, "amf")
     print(yaml.dump(new_yaml_data_amf))
     write_yaml("./transfers/some_folder/new_amf.yaml", new_yaml_data_amf, overwrite=False)
 
     # UPF testing section
-    #yaml_data_upf = read_yaml("./transfers/some_folder/upf.yaml")
-    #print(yaml_data_upf['upf']['subnet'])
-    #print(yaml.dump(yaml_data_upf))
+    # yaml_data_upf = read_yaml("./transfers/some_folder/upf.yaml")
+    # print(yaml_data_upf['upf']['subnet'])
+    # print(yaml.dump(yaml_data_upf))
 
 
 if __name__ == "__main__":
