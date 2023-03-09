@@ -99,6 +99,35 @@ def transfer_file(target_con: fabric.Connection, *, local_path: str, permissions
         return dest_path
 
 
+def transfer_configs(target_con: fabric.Connection, dest_path: str, type: str, *, overwrite: bool = False) -> None:
+    """
+    Transfers all yaml files of open5gs from the machine specified in the target con to the dest_path
+    If overwrite flag is set, the function will overwrite existing files in the path
+    If it is not set and files exist in the path, the function will not execute
+    This method theoretically does not need to be used every time. One fetch of open5gs and UERANSIM configs
+    Might be enough for config file modifications
+    :param target_con: fabric.Connection
+    :param dest_path: str
+    :param type: str
+    :param overwrite: bool
+    :return: None
+    """
+    try:
+        if os.path.exists(dest_path) and not overwrite:
+            raise FileExistsError("Overwrite flag was not set, but files exist in {}".format(dest_path))
+        if type.lower() not in ("open5gs", "ueransim"):
+            raise ValueError("Invalid type variable passed. Should be open5gs or ueransim")
+    except (FileExistsError, ValueError) as e:
+        logging.exception(e)
+        return
+    else:
+        if type == "open5gs":
+            get_file(target_con, "/etc/open5gs/", dest_path, folder_mode=True)
+        else:  # It must be UERANSIM due to earlier if statement
+            get_file(target_con, "/root/UERANSIM/config/open5gs-gnb.yaml", dest_path)
+            get_file(target_con, "/root/UERANSIM/config/open5gs-ue.yaml", dest_path)
+
+
 def get_file(target_con: fabric.connection, remote_path: str, dest_path: str = "", *,
              folder_mode: bool = False) -> None:
     # NOTE. Get method is unable to fetch files into a directory:
@@ -108,7 +137,7 @@ def get_file(target_con: fabric.connection, remote_path: str, dest_path: str = "
     """
     Transfers file from remote machine specified in target_con, to local filesystem.
     If folder_mode is true, it will attempt to transfer whole folder
-    Dest_path is appended to the 'transfers' folder
+    Dest_path should be relative to the 'transfers' folder.
     :param target_con: fabric.connection
     :param remote_path: str
     :param dest_path: str
@@ -137,7 +166,7 @@ def main():
     # Define necessary connection information
     ip_addr = "192.168.0.105"
     key_path = r"C:\Users\batru\Desktop\Keys\private_clean_ubuntu_20_clone"
-    c = connect(ip_addr, username="open5gs", key_path=key_path)
+    c = connect(ip_addr, username="root", key_path=key_path)
     # execute(c, command="echo $SHELL", sudo=False)
     dest_path = transfer_file(c, local_path="scripts/install_UERANSIM.sh", permissions="700")
     # if len(dest_path) == 0:
@@ -145,7 +174,8 @@ def main():
     # else:
     #     print("File transferred to {}".format(dest_path))
 
-    get_file(c, remote_path="/etc/open5gs/amf.yaml", dest_path="/some_folder", folder_mode=False)
+    #get_file(c, remote_path="/etc/open5gs/amf.yaml", dest_path="/some_folder", folder_mode=False)
+    transfer_configs(c, "/all_UERANSIM/", "UERANSIM")
 
 
 if __name__ == "__main__":
