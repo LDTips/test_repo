@@ -1,3 +1,4 @@
+import fabric
 import ruamel.yaml as yaml
 import logging
 import copy
@@ -62,7 +63,7 @@ def modify_yaml(src_dict: dict, new_values_dict: dict, file_type: str) -> dict:
     diff_dict = copy.deepcopy(src_dict)  # By default, python does a shallow cpy, which results in modifying amf_dict
     for key in new_values_dict:
         try:
-            diff_dict = function(key, diff_dict, new_values_dict[key])
+            diff_dict = function(key.split("-"), diff_dict, new_values_dict[key])
         except KeyError:
             # print("KeyError caught for {}".format(key))
             logging.exception("Key {} was not found in amf.yaml, but was passed in new_values dict".format(key))
@@ -70,8 +71,7 @@ def modify_yaml(src_dict: dict, new_values_dict: dict, file_type: str) -> dict:
     return diff_dict
 
 
-def main():
-    logging.basicConfig(filename="processing_yaml.log", level=logging.INFO)
+def test_amf():
     yaml_data_amf = read_yaml("./transfers/some_folder/amf.yaml")
     # AMF testing section
     test_dict_amf = {'sbi-addr': "1.1.1.1", 'sbi-port': 111, 'ngap-addr': "1.1.1.1", 'metrics-addr': "1.1.1.1",
@@ -84,10 +84,51 @@ def main():
     print(yaml.dump(new_yaml_data_amf))
     write_yaml("./transfers/some_folder/new_amf.yaml", new_yaml_data_amf, overwrite=False)
 
-    # UPF testing section
-    # yaml_data_upf = read_yaml("./transfers/some_folder/upf.yaml")
-    # print(yaml_data_upf['upf']['subnet'])
-    # print(yaml.dump(yaml_data_upf))
+
+def test_ausf():
+    test_dict = {'sbi-addr': "11.11.11.11", 'sbi-port': 1111}
+    yaml_data = read_yaml("./transfers/all_open5gs/ausf.yaml")
+    new_yaml_data = modify_yaml(yaml_data, test_dict, "ausf")
+    print(yaml.dump(new_yaml_data))
+
+
+def test_bsf():
+    test_dict = {'sbi-addr': "11.11.11.11", 'sbi-port': 1111, 'db_uri': "mongodb://remotehost/closed2gd"}
+    yaml_data = read_yaml("./transfers/all_open5gs/bsf.yaml")
+    new_yaml_data = modify_yaml(yaml_data, test_dict, "bsf")
+    print(yaml.dump(new_yaml_data))
+
+
+def test_hss():
+    test_dict = {'db_uri': "mongodb://", "freeDiameter": "/etc/hasd"}
+    yaml_data = read_yaml("./transfers/all_open5gs/hss.yaml")
+    new_yaml_data = modify_yaml(yaml_data, test_dict, "hss")
+    print(yaml.dump(new_yaml_data))
+
+
+def test_mme():
+    test_dict = {'freeDiameter': "/ctf", "s1ap-addr": "11.11.11.11", "gtpc-addr": "11.11.11.11",
+                 "metrics-addr": "11.11.11.11", "metrics-port": 11, 'gummei-plmn_id-mcc': 11, 'gummei-plmn_id-mnc': 11,
+                 'gummei-mme_gid': 11, 'gummei-mme_code': 11, 'tai-plmn_id-mcc': 11, 'tai-plmn_id-mnc': 11,
+                 'tai-tac': 11, 'security-integrity_order': [11, 11, 11], 'security-ciphering_order': [11, 11, 11],
+                 'network_name-full': "111111", "mme_name": "111111"}
+    yaml_data = read_yaml("./transfers/all_open5gs/mme.yaml")
+    new_yaml_data = modify_yaml(yaml_data, test_dict, "mme")
+    print(yaml.dump(new_yaml_data))
+
+
+def main():
+    logging.basicConfig(filename="processing_yaml.log", level=logging.INFO)
+    # AMF testing section
+    # test_amf()
+    # AUSF testing section
+    # test_ausf()
+    # BSF testing section
+    # test_bsf()
+    # HSS testing section
+    # test_hss()
+    # MME testing section
+    test_mme()
 
 
 if __name__ == "__main__":
