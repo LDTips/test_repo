@@ -77,7 +77,6 @@ def transfer_file(target_con: fabric.Connection, *, local_path: str, permissions
     :return: str
     """
 
-    # TODO - Is checking the correctness of permissions really necessary?
     # Extract the file name
     local_abspath = os.path.abspath(local_path)  # Get absolute path
     dest_file_name = os.path.basename(local_abspath)
@@ -145,7 +144,7 @@ def get_file(target_con: fabric.connection, remote_path: str, dest_path: str = "
     :return: str
     """
     # TODO - Determine why transferring whole folder does not work. Maybe it is just not possible?
-    # TODO - Implement this method, handle exceptions
+    # TODO - Handle Exceptions
     # Determine the directory contents
     if folder_mode:  # We need to fetch folder contents to transfer files one by one
         # Find only files (not folders) in the specified remote_path

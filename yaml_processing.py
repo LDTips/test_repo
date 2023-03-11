@@ -138,6 +138,79 @@ def test_nssf():
     write_yaml("./transfers/some_folder/new_nssf.yaml", new_yaml_data, overwrite=True)
 
 
+def test_pcf():
+    test_dict = {'sbi-addr': "11.11.11.11", 'sbi-port': 1234, "metrics-addr": "11.11.11.11", "metrics-port": 11}
+    yaml_data = read_yaml("./transfers/all_open5gs/pcf.yaml")
+    new_yaml_data = modify_yaml(yaml_data, test_dict, "pcf")
+    #print(yaml.dump(new_yaml_data))
+    write_yaml("./transfers/some_folder/new_pcf.yaml", new_yaml_data, overwrite=True)
+
+
+def test_pcrf():
+    test_dict = {'db_uri': r'mongodb://', 'freeDiameter': r"/etc"}
+    yaml_data = read_yaml("./transfers/all_open5gs/pcrf.yaml")
+    new_yaml_data = modify_yaml(yaml_data, test_dict, "pcrf")
+    #print(yaml.dump(new_yaml_data))
+    write_yaml("./transfers/some_folder/new_pcrf.yaml", new_yaml_data, overwrite=True)
+
+
+def test_scp():
+    # Most likely not needed, do not test!
+    test_dict = {'sbi-addr': "11.11.11.11", 'sbi-port': 1234}
+    yaml_data = read_yaml("./transfers/all_open5gs/scp.yaml")
+    new_yaml_data = modify_yaml(yaml_data, test_dict, "scp")
+    #print(yaml.dump(new_yaml_data))
+    write_yaml("./transfers/some_folder/new_scp.yaml", new_yaml_data, overwrite=True)
+
+
+def test_sgwc():
+    test_dict = {'gtpc-addr': "11.11.11.11", 'pfcp-addr': "11.11.11.11"}
+    yaml_data = read_yaml("./transfers/all_open5gs/sgwc.yaml")
+    new_yaml_data = modify_yaml(yaml_data, test_dict, "sgwc")
+    #print(yaml.dump(new_yaml_data))
+    write_yaml("./transfers/some_folder/new_sgwc.yaml", new_yaml_data, overwrite=True)
+
+
+def test_sgwu():
+    test_dict = {'gtpu-addr': "11.11.11.11", 'pfcp-addr': "11.11.11.11"}
+    yaml_data = read_yaml("./transfers/all_open5gs/sgwu.yaml")
+    new_yaml_data = modify_yaml(yaml_data, test_dict, "sgwu")
+    #print(yaml.dump(new_yaml_data))
+    write_yaml("./transfers/some_folder/new_sgwu.yaml", new_yaml_data, overwrite=True)
+
+
+def test_smf():
+    test_dict = {'sbi-addr': "11.11.11.11", 'sbi-port': 1234, 'pfcp-addr': "11.11.11.11", 'gtpc-addr': "11.11.11.11",
+                 'gtpu-addr': "11.11.11.11", 'metrics-addr': "11.11.11.11", 'metrics-port': 1234, 'dns': "11.11.11.11",
+                 'mtu': 1111, 'ctf-enabled': "aaaa", 'freeDiameter': "/etc", 'subnet-addr': "11.11.11.11/11"}
+    yaml_data = read_yaml("./transfers/all_open5gs/smf.yaml")
+    new_yaml_data = modify_yaml(yaml_data, test_dict, "smf")
+    #print(yaml.dump(new_yaml_data))
+    write_yaml("./transfers/some_folder/new_smf.yaml", new_yaml_data, overwrite=True)
+
+
+def test_udm():
+    # Not implemented due to complexity; we will not need it most likely any way
+    pass
+
+
+def test_udr():
+    test_dict = {'sbi-addr': "11.11.11.11", 'sbi-port': 1234}
+    yaml_data = read_yaml("./transfers/all_open5gs/udr.yaml")
+    new_yaml_data = modify_yaml(yaml_data, test_dict, "udr")
+    #print(yaml.dump(new_yaml_data))
+    write_yaml("./transfers/some_folder/new_udr.yaml", new_yaml_data, overwrite=True)
+
+
+def test_upf():
+    test_dict = {'pfcp-addr': "11.11.11.11", 'metrics-addr': "11.11.11.11", 'metrics-port': 1234,
+                 'gtpu-addr': "11.11.11.11", 'subnet-addr': "11.11.11.11"}
+    yaml_data = read_yaml("./transfers/all_open5gs/upf.yaml")
+    new_yaml_data = modify_yaml(yaml_data, test_dict, "upf")
+    #print(yaml.dump(new_yaml_data))
+    write_yaml("./transfers/some_folder/new_upf.yaml", new_yaml_data, overwrite=True)
+
+
 def main():
     # TODO - Is the lack of ability to rename standalone values in yaml files ok?
     # e.g. BSF.yaml has db_uri value as bsf: db_uri (nested), but also db_uri: (standalone)
@@ -146,26 +219,21 @@ def main():
     # If only one exists (only nested or only standalone), there is no issue
 
     logging.basicConfig(filename="processing_yaml.log", level=logging.INFO)
-    # AMF testing section
+    # All tests work
     test_amf()
-
-    # AUSF testing section
     test_ausf()
-
-    # BSF testing section
     test_bsf()
-
-    # HSS testing section
     test_hss()
-
-    # MME testing section
     test_mme()
-
-    # NRF testing section
     test_nrf()
-
-    # NSSF testing section
     test_nssf()
+    test_pcf()
+    test_pcrf()
+    test_sgwc()
+    test_sgwu()
+    test_smf()
+    test_udr()
+    test_upf()
 
 
 if __name__ == "__main__":
