@@ -42,13 +42,19 @@ def write_yaml(file_path: str, yaml_data: dict, *, overwrite: bool = False) -> N
         logging.exception(e)
 
 
-def driver(key: list[str], diff_dict: dict, new_value: int | str) -> dict:
+def modify_dict(key: list[str], diff_dict: dict, new_value: int | str) -> dict:
     message = "Could not assign key {}. No match".format(key)
     try:
-        if len(key) == 1:
+        if len(key) == 1 and key[0][:-1] not in ("gnbSearchList", "amfConfigs"):
             diff_dict[key[0]] = new_value
+        elif len(key) == 1:
+            if (len(diff_dict[key[0][:-1]]) - 1) < int(key[0][-1]):  # To avoid access of bad index
+                diff_dict[key[0][:-1]].append(new_value)
+            else:
+                diff_dict[key[0][:-1]][int(key[0][-1])] = new_value
 
         if len(key) == 2:
+            print("Fired for {}".format(key))
             diff_dict[key[0]][0][key[1]] = new_value
 
         elif len(key) == 3:
@@ -78,7 +84,7 @@ def modify_yaml(src_dict: dict, new_values_dict: dict) -> dict:
     """
     diff_dict = copy.deepcopy(src_dict)  # By default, python does a shallow cpy, which results in modifying amf_dict
     for key in new_values_dict:
-        diff_dict = driver(key.split("-"), diff_dict, new_values_dict[key])
+        diff_dict = modify_dict(key.split("-"), diff_dict, new_values_dict[key])
 
     return diff_dict
 
@@ -93,7 +99,7 @@ def test_amf():
     write_yaml("./transfers/some_folder/amf_realconfig_test.yaml", new_yaml_data, overwrite=True)
 
 
-def test_smf():
+def test_smf(advanced: bool = False):
     test_dict = {'smf-pfcp0-addr': "192.168.0.111",
                  'smf-subnet0-addr': "10.45.0.1/16", 'smf-subnet0-dnn': "internet",
                  'smf-subnet1-addr': "10.46.0.1/16", 'smf-subnet1-dnn': "internet2",
@@ -102,11 +108,11 @@ def test_smf():
                  'upf-pfcp1-addr': "192.168.0.113", 'upf-pfcp1-dnn': "ims",
                  }
     yaml_data1 = read_yaml("./transfers/all_open5gs/smf.yaml")
-    # Uncomment two lines below for the more advanced version from
     # https://github.com/s5uishida/open5gs_5gc_ueransim_nearby_upf_sample_config#changes-in-configuration-files-of-open5gs-5gc-c-plane
-    test_dict.update({'smf-info0-s_nssai': [{"sst": 1, "dnn": ["internet"]}],
+    if advanced:
+        test_dict.update({'smf-info0-s_nssai': [{"sst": 1, "dnn": ["internet"]}],
                       'smf-info0-tai': [{'plmn_id': {'mcc': '001', 'mnc': '01'}, 'tac': 2}]})
-    yaml_data1['smf']['info'] = list()  # Needs to be created manually
+        yaml_data1['smf']['info'] = list()  # Needs to be created manually
 
     new_yaml_data = modify_yaml(yaml_data1, test_dict)
     print(yaml.dump(new_yaml_data))
@@ -124,6 +130,30 @@ def test_upf():
     write_yaml("./transfers/some_folder/upf_realconfig_test.yaml", new_yaml_data, overwrite=True)
 
 
+def test_ue():
+    test_dict = {'supi': 'imsi-001010000000000', 'mcc': '001', 'mnc': '01',
+                 'gnbSearchList0': '192.168.0.131', 'gnbSearchList1': '11.11.112.11',
+                 'sessions-apn': "internet231"}
+    yaml_data = read_yaml("./transfers/all_UERANSIM/open5gs-ue.yaml")
+    new_yaml_data = modify_yaml(yaml_data, test_dict)
+    # new_yaml_data['gnbSearchList'][0] = '192.168.0.131'
+    # new_yaml_data['gnbSearchList'].append('11.11.11.11')
+    # print(yaml_data['gnbSearchList'][0])
+    write_yaml("./transfers/some_folder/ue_realconfig_test.yaml", new_yaml_data, overwrite=True)
+
+
+def test_gnb():
+    test_dict = {'tac': 1, 'mcc': '001', 'mnc': '01', 'linkIp': "191.168.0.131", 'ngapIp': "191.168.0.131",
+                 'gtpIp': "191.168.0.131",
+                 'amfConfigs-address': "192.168.0.111",
+                 'gnbSearchList0': '192.168.0.131', 'gnbSearchList1': '11.11.112.11'}
+    yaml_data = read_yaml("./transfers/all_UERANSIM/open5gs-gnb.yaml")
+    new_yaml_data = modify_yaml(yaml_data, test_dict)
+    # new_yaml_data['gnbSearchList'].append('11.11.11.11')
+    # print(yaml_data['gnbSearchList'][0])
+    write_yaml("./transfers/some_folder/gnb_realconfig_test.yaml", new_yaml_data, overwrite=True)
+
+
 def main():
     logging.basicConfig(filename="processing_yaml.log", level=logging.INFO)
     logging.info("\n--------------------------------------\n"
@@ -132,8 +162,12 @@ def main():
                  .format(datetime.now()))
     # Testing section open5gs
     # test_amf()
-    # test_smf()
+    # test_smf(False)
     # test_upf()
+
+    # Testing section UERANSIM
+    # test_ue()
+    # test_gnb()
 
 
 if __name__ == "__main__":
