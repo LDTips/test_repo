@@ -43,7 +43,7 @@ def write_yaml(file_path: str, yaml_data: dict, *, overwrite: bool = False) -> N
 
 
 def driver(key: list[str], diff_dict: dict, new_value: int | str) -> dict:
-    message = "Could not assign key {}. No match"
+    message = "Could not assign key {}. No match".format(key)
     try:
         if len(key) == 1:
             diff_dict[key[0]] = new_value
@@ -55,14 +55,14 @@ def driver(key: list[str], diff_dict: dict, new_value: int | str) -> dict:
             # Last char of key[1] is the array index, hence we do slicing to get key name, and key[-1] to get arr index
             if (len(diff_dict[key[0]][key[1][:-1]]) - 1) < int(key[1][-1]):  # To avoid access of bad index
                 diff_dict[key[0]][key[1][:-1]].append(dict())
-
+            print("diff_dict[{}][{}][{}][{}]".format(key[0], key[1][:-1], int(key[1][-1]), key[2]))
             diff_dict[key[0]][key[1][:-1]][int(key[1][-1])][key[2]] = new_value
 
         elif len(key) == 4:
             diff_dict[key[0]][key[1]][0][key[2]][key[3]] = new_value
 
     except (KeyError, TypeError):
-        logging.exception(message.format(*key))
+        logging.exception(message)
 
     return diff_dict
 
@@ -89,7 +89,7 @@ def test_amf():
                  'amf-tai-plmn_id-mcc': "001", 'amf-tai-plmn_id-mnc': "01",
                  'amf-plmn_support-plmn_id-mcc': "001", 'amf-plmn_support-plmn_id-mnc': "01"}
     new_yaml_data = modify_yaml(yaml_data, test_dict)
-    #print(yaml.dump(new_yaml_data))
+    print(yaml.dump(new_yaml_data))
     write_yaml("./transfers/some_folder/amf_realconfig_test.yaml", new_yaml_data, overwrite=True)
 
 
@@ -99,10 +99,17 @@ def test_smf():
                  'smf-subnet1-addr': "10.46.0.1/16", 'smf-subnet1-dnn': "internet2",
                  'smf-subnet2-addr': "10.47.0.1/16", 'smf-subnet2-dnn': "ims",
                  'upf-pfcp0-addr': "192.168.0.112", 'upf-pfcp0-dnn': ["internet", "internet2"],
-                 'upf-pfcp1-addr': "192.168.0.113", 'upf-pfcp1-dnn': "ims"}
+                 'upf-pfcp1-addr': "192.168.0.113", 'upf-pfcp1-dnn': "ims",
+                 }
     yaml_data1 = read_yaml("./transfers/all_open5gs/smf.yaml")
+    # Uncomment two lines below for the more advanced version from
+    # https://github.com/s5uishida/open5gs_5gc_ueransim_nearby_upf_sample_config#changes-in-configuration-files-of-open5gs-5gc-c-plane
+    test_dict.update({'smf-info0-s_nssai': [{"sst": 1, "dnn": ["internet"]}],
+                      'smf-info0-tai': [{'plmn_id': {'mcc': '001', 'mnc': '01'}, 'tac': 2}]})
+    yaml_data1['smf']['info'] = list()  # Needs to be created manually
+
     new_yaml_data = modify_yaml(yaml_data1, test_dict)
-    # print(yaml.dump(yaml_data1))
+    print(yaml.dump(new_yaml_data))
     write_yaml("./transfers/some_folder/smf_realconfig_test.yaml", new_yaml_data, overwrite=True)
 
 
@@ -123,10 +130,10 @@ def main():
                  "Start log {}"
                  "\n--------------------------------------"
                  .format(datetime.now()))
-    # Testing section
-    test_amf()
-    test_smf()
-    test_upf()
+    # Testing section open5gs
+    # test_amf()
+    # test_smf()
+    # test_upf()
 
 
 if __name__ == "__main__":
