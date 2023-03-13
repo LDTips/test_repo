@@ -1,15 +1,13 @@
 #!/bin/bash
 # Script is most likely operational. Fixed issue with mongod process persisting
 if [[ $EUID -ne 0 ]]; then
-  echo "Root privileges needed"
-  echo "Aborting installation"
-  exit
+  echo "Root privileges needed. Installation cancelled" 1>&2
+  exit 1
 fi
 
 if [[ -f "/bin/open5gs-amfd" ]]; then
-  echo "Open5gs is most likely installed. One of binaries present in /bin"
-  echo "Aborting installation"
-  exit
+  echo "Open5gs is most likely installed. One of the binaries are present in /bin. Installation cancelled" 1>&2
+  exit 2
 fi
 
 # Fetching dependency for open5gs and adding repository

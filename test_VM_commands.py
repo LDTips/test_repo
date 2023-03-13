@@ -8,10 +8,10 @@ def connect(ip_addr: str, *, username: str, key_path: str) -> fabric.Connection:
     """
     Establishes and checks the possibility of an SSH connection with specified parameters.
     If connection is not possible, a message informing about that is written to stderr
-    :param ip_addr:
-    :param username:
-    :param key_path:
-    :return:
+    :param ip_addr: str
+    :param username: str
+    :param key_path: str
+    :return: fabric.Connection
     """
     # Initiate connection params
     c = fabric.Connection(
@@ -59,8 +59,7 @@ def execute(target_con: fabric.Connection, *, command: str, sudo: bool = False) 
         if sudo:
             e.result.command = e.result.command[31:]
         logging.exception(out_err.format(e.result))
-        exit(1)
-        # TODO - Is exiting really the best behavior here?
+        return e.result
     else:
         return result
 
@@ -89,7 +88,7 @@ def transfer_file(target_con: fabric.Connection, local_path: str, dest_path: str
         return dest_path
 
 
-def transfer_configs(target_con: fabric.Connection, dest_path: str, type: str, *, overwrite: bool = False) -> None:
+def get_default_configs(target_con: fabric.Connection, dest_path: str, type: str, *, overwrite: bool = False) -> None:
     """
     Transfers all yaml files of open5gs from the machine specified in the target con to the dest_path
     If overwrite flag is set, the function will overwrite existing files in the path
@@ -118,12 +117,12 @@ def transfer_configs(target_con: fabric.Connection, dest_path: str, type: str, *
             get_file(target_con, "/root/UERANSIM/config/open5gs-ue.yaml", dest_path)
 
 
+# NOTE. Get method is unable to fetch files into a directory:
+# target_con.get(remote_path, "./configs/nrf.yaml")  # e.g. when remote_path is /etc/open5gs/nrf.yaml - works
+# target_con.get(remote_path, "./")  # when remote_path is /etc/open5gs/ does not work, because:
+# PermissionError: [Errno 13] Permission denied: 'C:\\Users\\batru\\Desktop\\system_commands_testing\\configs'
 def get_file(target_con: fabric.connection, remote_path: str, dest_path: str = "", *,
              folder_mode: bool = False) -> None:
-    # NOTE. Get method is unable to fetch files into a directory:
-    # target_con.get(remote_path, "./configs/nrf.yaml")  # e.g. when remote_path is /etc/open5gs/nrf.yaml - works
-    # target_con.get(remote_path, "./")  # when remote_path is /etc/open5gs/ does not work, because:
-    # PermissionError: [Errno 13] Permission denied: 'C:\\Users\\batru\\Desktop\\system_commands_testing\\configs'
     """
     Transfers file from remote machine specified in target_con, to local filesystem.
     If folder_mode is true, it will attempt to transfer whole folder
@@ -142,7 +141,7 @@ def get_file(target_con: fabric.connection, remote_path: str, dest_path: str = "
         file_list = execute(target_con, command='find {} -maxdepth 1 -type f'.format(remote_path))
         # Split each file path into different array indexes
         file_list = file_list.stdout.split()
-        # Since find gives the full path, we need to extract only the file names
+        # Since find gives the full path, we need to extract only the file names to properly specify the destination
         file_names = [file.split("/")[-1] for file in file_list]
         for file_path, file_name in zip(file_list, file_names):
             target_con.get(file_path, "./transfers/{}/{}".format(dest_path, file_name))
@@ -151,18 +150,62 @@ def get_file(target_con: fabric.connection, remote_path: str, dest_path: str = "
         target_con.get(remote_path, "./transfers/{}/{}".format(dest_path, file_name))
 
 
+def install_open5gs(target_con: fabric.Connection) -> None:
+    """
+    Does necessary file transfers and commands executions to install Open5gs
+    On the machine specified by the ip_addr, authenticating with key found in key_path
+    :param target_con: fabric.Connection
+    :return: None
+    """
+
+    message = "Transfer of file {} to dest {} on machine {}"
+    src_path = "./scripts/install_open5gs.sh"  # dot specifies relative path
+    if target_con.user != "root":
+        dest_path = "/home/{}/install_open5gs".format(target_con.user)
+    else:
+        dest_path = "/root/install_open5gs"
+
+    result_path = transfer_file(target_con, src_path, dest_path, permissions="744")  # rwxr--r--
+    if len(result_path) != 0:
+        logging.info(message.format(src_path, dest_path, target_con.host) + " successful!")
+    else:
+        # Logging might not be needed as message is already written out in the transfer_file function
+        logging.error(message.format(src_path, dest_path, target_con.host) + " FAILED!")
+        return
+    # Sudo true is needed in case connection is for the non-root user
+    # However, if "no password sudo" is not enabled, this will not work for non-root
+    execute(target_con, command="~/install_open5gs.sh", sudo=True)
+
+
+def setup_end(ip_addr: str, key_path: str) -> None:
+    """
+    Method prints necessary information regarding user interaction with the machine
+    After the setup was completed
+    :param ip_addr: str
+    :param key_path: str
+    :return: None
+    """
+    print("Machine at address {} has completed setup\nAccess it with the following command:")
+    print("ssh -i {key} <username>@{IP}".format(key=key_path, IP=ip_addr))
+    print("Note: Key path can be relative")
+    print("Note 2: If issues arise with bad key security error from ssh command, use windows cmd commands:")
+    print("icacls <private_key_path> /inheritance:r\n icacls <private_key_path> /grant:r \"%username%\":\"(R)\"")
+
+
 def main():
-    logging.basicConfig(filename="test.log", level=logging.DEBUG)
+    logging.basicConfig(filename="test.log", level=logging.INFO)
     # Define necessary connection information
     ip_addr = ["192.168.0.105"]
     key_path_all = r"C:\Users\batru\Desktop\Keys\private_clean_ubuntu_20_clone"
     c = connect(ip_addr[0], username="root", key_path=key_path_all)
     # execute(c, command="echo $SHELL", sudo=False)
-    dest_path = transfer_file(c, "transfers/some_folder/new_amf.yaml", "/etc/open5gs/amf.yaml", permissions="600")
-    if len(dest_path) == 0:
-        print("File not transferred. Check log")
-    else:
-        print("File transferred to {}".format(dest_path))
+    install_open5gs(c)
+    # "transfers/some_folder/amf_realconfig_test.yaml"
+    # dest_path = transfer_file(c, "/transfers/all_open5gs/amf.yaml", "/etc/open5gs/amf.yaml", permissions="600")
+    # if len(dest_path) == 0:
+    #     print("File not transferred. Check log")
+    # else:
+    #     print("File transferred to {}".format(dest_path))
 
     # get_file(c, remote_path="/etc/open5gs/amf.yaml", dest_path="/some_folder", folder_mode=False)
     # transfer_configs(c, "/all_UERANSIM/", "UERANSIM")

@@ -2,10 +2,14 @@
 # Tested once. Works. Requires some more extensive testing
 # This script is less complex than open5gs
 if [[ $EUID -ne 0 ]]; then
-  echo "Root privileges needed"
-  exit
+  echo "Root privileges needed" 1>&2
+  exit 1
 fi
-# TODO - Implement an if statement that aborts installation if UERANSIM is installed
+
+if [[ -d "$HOME/UERANSIM"  ]]; then
+  echo "UERANSIM is most likely installed. UERANSIM dolder exists at home dir. Installation cancelled" 1>&2
+  exit 2
+fi
 
 # Fetch dependencies
 apt-get update
