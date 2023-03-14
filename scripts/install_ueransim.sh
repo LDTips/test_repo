@@ -7,7 +7,7 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 if [[ -d "$HOME/UERANSIM"  ]]; then
-  echo "UERANSIM is most likely installed. UERANSIM dolder exists at home dir. Installation cancelled" 1>&2
+  echo "UERANSIM is most likely installed. UERANSIM folder exists at home dir. Installation cancelled" 1>&2
   exit 2
 fi
 

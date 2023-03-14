@@ -150,20 +150,25 @@ def get_file(target_con: fabric.connection, remote_path: str, dest_path: str = "
         target_con.get(remote_path, "./transfers/{}/{}".format(dest_path, file_name))
 
 
-def install_open5gs(target_con: fabric.Connection) -> None:
+def install_sim(target_con: fabric.Connection, sim_name: str) -> None:
     """
-    Does necessary file transfers and commands executions to install Open5gs
+    Does necessary file transfers and commands executions to install Open5Gs or UERANSIM
     On the machine specified by the ip_addr, authenticating with key found in key_path
     :param target_con: fabric.Connection
+    :param sim_name: str
     :return: None
     """
+    if sim_name.lower() not in ("ueransim", "open5gs"):
+        logging.error("Install_sim called with invalid simulator type to install. Aborting installation")
+        return
 
     message = "Transfer of file {} to dest {} on machine {}"
-    src_path = "./scripts/install_open5gs.sh"  # dot specifies relative path
+    src_path = "./scripts/install_{}.sh".format(sim_name.lower())  # dot specifies relative path
+    # Due to internals of put command, we need full path. Tilde (home) won't work
     if target_con.user != "root":
-        dest_path = "/home/{}/install_open5gs".format(target_con.user)
+        dest_path = "/home/{}/install_{}".format(target_con.user, sim_name.lower())
     else:
-        dest_path = "/root/install_open5gs"
+        dest_path = "/root/install_{}".format(sim_name.lower())
 
     result_path = transfer_file(target_con, src_path, dest_path, permissions="744")  # rwxr--r--
     if len(result_path) != 0:
@@ -174,7 +179,7 @@ def install_open5gs(target_con: fabric.Connection) -> None:
         return
     # Sudo true is needed in case connection is for the non-root user
     # However, if "no password sudo" is not enabled, this will not work for non-root
-    execute(target_con, command="~/install_open5gs.sh", sudo=True)
+    execute(target_con, command=dest_path, sudo=True)
 
 
 def setup_end(ip_addr: str, key_path: str) -> None:
@@ -199,7 +204,7 @@ def main():
     key_path_all = r"C:\Users\batru\Desktop\Keys\private_clean_ubuntu_20_clone"
     c = connect(ip_addr[0], username="root", key_path=key_path_all)
     # execute(c, command="echo $SHELL", sudo=False)
-    install_open5gs(c)
+    # install_open5gs(c)
     # "transfers/some_folder/amf_realconfig_test.yaml"
     # dest_path = transfer_file(c, "/transfers/all_open5gs/amf.yaml", "/etc/open5gs/amf.yaml", permissions="600")
     # if len(dest_path) == 0:
