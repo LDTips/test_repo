@@ -110,7 +110,7 @@ def get_default_configs(target_con: fabric.Connection, dest_path: str, type: str
         logging.exception(e)
         return
     else:
-        if type == "open5gs":
+        if type.lower() == "open5gs":
             get_file(target_con, "/etc/open5gs/", dest_path, folder_mode=True)
         else:  # It must be UERANSIM due to earlier if statement
             get_file(target_con, "/root/UERANSIM/config/open5gs-gnb.yaml", dest_path)
@@ -133,21 +133,27 @@ def get_file(target_con: fabric.connection, remote_path: str, dest_path: str = "
     :param folder_mode: bool
     :return: str
     """
-    # TODO - Determine why transferring whole folder does not work. Maybe it is just not possible?
     # TODO - Handle Exceptions
     # Determine the directory contents
-    if folder_mode:  # We need to fetch folder contents to transfer files one by one
-        # Find only files (not folders) in the specified remote_path
-        file_list = execute(target_con, command='find {} -maxdepth 1 -type f'.format(remote_path))
-        # Split each file path into different array indexes
-        file_list = file_list.stdout.split()
-        # Since find gives the full path, we need to extract only the file names to properly specify the destination
-        file_names = [file.split("/")[-1] for file in file_list]
-        for file_path, file_name in zip(file_list, file_names):
-            target_con.get(file_path, "./transfers/{}/{}".format(dest_path, file_name))
-    else:
-        file_name = remote_path.split("/")[-1]
-        target_con.get(remote_path, "./transfers/{}/{}".format(dest_path, file_name))
+    try:  # If the file or folder in remote_path doesnt exist, the exception is handled in the execute function
+        if folder_mode:  # We need to fetch folder contents to transfer files one by one
+            # Find only files (not folders) in the specified remote_path
+            file_list = execute(target_con, command='find {} -maxdepth 1 -type f'.format(remote_path))
+            if len(file_list.stdout) == 0:
+                raise ValueError(file_list.stderr)
+            # Split each file path into different array indexes
+            file_list = file_list.stdout.split()
+            # Since find gives the full path, we need to extract only the file names to properly specify the destination
+            file_names = [file.split("/")[-1] for file in file_list]
+            for file_path, file_name in zip(file_list, file_names):
+                dest_folder = "./transfers/{}/{}".format(dest_path, file_name)
+                target_con.get(file_path, dest_folder)
+        else:
+            file_name = remote_path.split("/")[-1]
+            target_con.get(remote_path, "./transfers/{}/{}".format(dest_path, file_name))
+    except ValueError:
+        logging.exception("Transfer failed: unable to fetch file list for {}".format(remote_path))
+        return
 
 
 def install_sim(target_con: fabric.Connection, sim_name: str) -> None:
@@ -158,9 +164,11 @@ def install_sim(target_con: fabric.Connection, sim_name: str) -> None:
     :param sim_name: str
     :return: None
     """
-    if sim_name.lower() not in ("ueransim", "open5gs"):
-        logging.error("Install_sim called with invalid simulator type to install. Aborting installation")
-        return
+    try:
+        if sim_name.lower() not in ("ueransim", "open5gs"):
+            raise ValueError("Install_sim called with invalid simulator type to install. Aborting installation")
+    except ValueError as e:
+        logging.exception(e)
 
     message = "Transfer of file {} to dest {} on machine {}"
     src_path = "./scripts/install_{}.sh".format(sim_name.lower())  # dot specifies relative path
@@ -202,7 +210,8 @@ def main():
     # Define necessary connection information
     ip_addr = ["192.168.0.105"]
     key_path_all = r"C:\Users\batru\Desktop\Keys\private_clean_ubuntu_20_clone"
-    c = connect(ip_addr[0], username="root", key_path=key_path_all)
+    c = connect(ip_addr[0], username="open5gs", key_path=key_path_all)
+    get_file(c, "/root/install_ueransim", folder_mode=True)
     # execute(c, command="echo $SHELL", sudo=False)
     # install_open5gs(c)
     # "transfers/some_folder/amf_realconfig_test.yaml"
