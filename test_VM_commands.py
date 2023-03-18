@@ -244,23 +244,35 @@ def setup_end(ip_addr: str, key_path: str) -> None:
     print("icacls <private_key_path> /inheritance:r\n icacls <private_key_path> /grant:r \"%username%\":\"(R)\"")
 
 
+def init_connections(conn_dict: {str: str}) -> [fabric.Connection]:
+    """
+    Connects to all machines from the ip_addr:key_path dictionary
+    :param conn_dict: dict
+    :return: [fabric.Connection]
+    """
+    c = []
+    for ip, key_path in conn_dict.items():
+        c.append(connect(ip, username="open5gs", key_path=key_path))
+    return c
+
+
 def main():
     # Driver function; testing
     logging.basicConfig(filename="test.log", level=logging.INFO)
     # Define necessary connection information
-    ip_addr = ["192.168.0.105"]
+    ip_addr = ["192.168.111.105", "192.168.111.110"]
     key_path_all = r"C:\Users\batru\Desktop\Keys\private_clean_ubuntu_20_clone"
-    c = connect(ip_addr[0], username="open5gs", key_path=key_path_all)
-    put_file(c, "./transfers/all_open5gs/amf.yaml", "/root/test_file.yaml", permissions="444", overwrite=False, sudo=True)
+    conn_dict = {ip_addr[0]: key_path_all, ip_addr[1]: key_path_all}
+    print(conn_dict)
+    c = init_connections(conn_dict)
+    execute(c[0], command="ip a")
+    execute(c[1], command="ip a")
+    # put_file(c, "./transfers/all_open5gs/amf.yaml", "/root/test_file.yaml", permissions="444", overwrite=False, sudo=True)
     # get_file(c, "/root/install_ueransim", folder_mode=True)
     # execute(c, command="echo $SHELL", sudo=False)
     # install_open5gs(c)
     # "transfers/some_folder/amf_realconfig_test.yaml"
     # dest_path = transfer_file(c, "/transfers/all_open5gs/amf.yaml", "/etc/open5gs/amf.yaml", permissions="600")
-    # if len(dest_path) == 0:
-    #     print("File not transferred. Check log")
-    # else:
-    #     print("File transferred to {}".format(dest_path))
     # put_file(c, "./transfers/all_open5gs/amf.yaml", "/etc/open5gs/amf.yaml", permissions="644", overwrite=False)
     # get_file(c, remote_path="/etc/open5gs/amf.yaml", dest_path="/some_folder", folder_mode=False)
     # transfer_configs(c, "/all_UERANSIM/", "UERANSIM")
