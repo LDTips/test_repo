@@ -64,28 +64,38 @@ def execute(target_con: fabric.Connection, *, command: str, sudo: bool = False) 
         return result
 
 
-def transfer_file(target_con: fabric.Connection, local_path: str, dest_path: str, *, permissions: str) -> str:
+def put_file(target_con: fabric.Connection, local_path: str, dest_path: str, *,
+             permissions: str, overwrite: bool = False) -> str:
     """
     Transfers a file found at file_path to the machine specified in target_con.
     Due to harder implementation, sudo version of the method might not be implemented in the future
     Permissions determines the permission on the target system. Should be of Linux format e.g. "700"
+    Overwrite flag defines whether the file should be overwritten in destination if it exists
     Returns the remote path of the file that was put. Returns empty string if transfer failed
     :param target_con: fabric.Connection
     :param local_path: str
     :param dest_path: str
     :param permissions: str
+    :param overwrite: bool
     :return: str
     """
 
     try:
+        file_list = execute(target_con, command='find {} -maxdepth 1 -type f'.format(dest_path))
+        if dest_path in file_list.stdout.split() and not overwrite:
+            raise FileExistsError("Overwrite flag was not set, but file already exists on target machine!")
         # Transfer the file with put
-        target_con.put(local_path, dest_path)
+        target_con.put(local_path, dest_path)  # Might throw permission error if attempt to transfer folder is made
         target_con.run('chmod {perm} {path}'.format(perm=permissions, path=dest_path))
-    except (OSError, FileNotFoundError) as e:  # General error raised if transfer fails
-        logging.exception("Error occurred while transferring {}\nReason: {}".format(local_path, e))
-        return ""
+    except (FileNotFoundError, FileExistsError) as e:  # General error raised if transfer fails
+        logging.exception("File related error occurred while transferring {}\nReason: {}".format(local_path, e))
+    except OSError:
+        logging.exception(
+            "OSError occured while transferring {}. Most likely a try to transmit a folder was done".format(local_path))
     else:
         return dest_path
+
+    return ""  # When an exception is caught
 
 
 def get_default_configs(target_con: fabric.Connection, dest_path: str, type: str, *, overwrite: bool = False) -> None:
@@ -112,7 +122,7 @@ def get_default_configs(target_con: fabric.Connection, dest_path: str, type: str
     else:
         if type.lower() == "open5gs":
             get_file(target_con, "/etc/open5gs/", dest_path, folder_mode=True)
-        else:  # It must be UERANSIM due to earlier if statement
+        else:  # It must be UERANSIM due to earlier if statement at line 107
             get_file(target_con, "/root/UERANSIM/config/open5gs-gnb.yaml", dest_path)
             get_file(target_con, "/root/UERANSIM/config/open5gs-ue.yaml", dest_path)
 
@@ -178,7 +188,7 @@ def install_sim(target_con: fabric.Connection, sim_name: str) -> None:
     else:
         dest_path = "/root/install_{}".format(sim_name.lower())
 
-    result_path = transfer_file(target_con, src_path, dest_path, permissions="744")  # rwxr--r--
+    result_path = put_file(target_con, src_path, dest_path, permissions="744", overwrite=True)  # mod: rwxr--r--
     if len(result_path) != 0:
         logging.info(message.format(src_path, dest_path, target_con.host) + " successful!")
     else:
@@ -206,11 +216,12 @@ def setup_end(ip_addr: str, key_path: str) -> None:
 
 
 def main():
+    # Driver function; testing
     logging.basicConfig(filename="test.log", level=logging.INFO)
     # Define necessary connection information
     ip_addr = ["192.168.0.105"]
     key_path_all = r"C:\Users\batru\Desktop\Keys\private_clean_ubuntu_20_clone"
-    c = connect(ip_addr[0], username="open5gs", key_path=key_path_all)
+    c = connect(ip_addr[0], username="root", key_path=key_path_all)
     get_file(c, "/root/install_ueransim", folder_mode=True)
     # execute(c, command="echo $SHELL", sudo=False)
     # install_open5gs(c)
@@ -220,7 +231,7 @@ def main():
     #     print("File not transferred. Check log")
     # else:
     #     print("File transferred to {}".format(dest_path))
-
+    put_file(c, "./transfers/all_open5gs/amf.yaml", "/etc/open5gs/amf.yaml", permissions="644", overwrite=False)
     # get_file(c, remote_path="/etc/open5gs/amf.yaml", dest_path="/some_folder", folder_mode=False)
     # transfer_configs(c, "/all_UERANSIM/", "UERANSIM")
 
