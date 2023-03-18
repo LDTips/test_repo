@@ -43,6 +43,7 @@ def execute(target_con: fabric.Connection, *, command: str, sudo: bool = False) 
     :param sudo: bool
     :return: fabric.Result
     """
+    print("executing {}".format(command))
     out = "Executed {0.command!r} on {0.connection.host}, got output \n{0.stdout}execution code {0.return_code}\n"
     out_err = "Error during execution of {0.command!r} on {0.connection.host}.\n" \
               "Got output on stderr \n{0.stderr}error code {0.return_code}\n"
@@ -59,13 +60,33 @@ def execute(target_con: fabric.Connection, *, command: str, sudo: bool = False) 
         if sudo:
             e.result.command = e.result.command[31:]
         logging.exception(out_err.format(e.result))
-        return e.result
+        raise  # re-raise the last exception to be handled in the caller functions (e.g. put_file)
     else:
         return result
 
 
+def sudo_put_file(target_con: fabric.Connection, local_path: str, dest_path: str, *,
+                  permissions: str):
+    """
+    Helper function for the put_file, sudo variant
+    https://github.com/fabric/fabric/issues/1750
+    :param target_con: fabric.Connection
+    :param local_path: str
+    :param dest_path: str
+    :param permissions: str
+    """
+    temp_file = execute(target_con, command="mktemp")
+    temp_file = temp_file.stdout.strip()  # Get the created temporary file name
+
+    # Exceptions are already handled in the called functions
+    put_file(target_con, local_path, temp_file, permissions=permissions, overwrite=True)  # Overwrite temp file
+    execute(target_con, command="install -o root -g root -m {} {} {}".format(permissions, temp_file, dest_path), sudo=True)
+
+    execute(target_con, command="rm {}".format(temp_file))
+
+
 def put_file(target_con: fabric.Connection, local_path: str, dest_path: str, *,
-             permissions: str, overwrite: bool = False) -> str:
+             permissions: str, overwrite: bool = False, sudo: bool = False) -> str:
     """
     Transfers a file found at file_path to the machine specified in target_con.
     Due to harder implementation, sudo version of the method might not be implemented in the future
@@ -77,25 +98,33 @@ def put_file(target_con: fabric.Connection, local_path: str, dest_path: str, *,
     :param dest_path: str
     :param permissions: str
     :param overwrite: bool
+    :param sudo: bool
     :return: str
     """
-
     try:
-        file_list = execute(target_con, command='find {} -maxdepth 1 -type f'.format(dest_path))
-        if dest_path in file_list.stdout.split() and not overwrite:
-            raise FileExistsError("Overwrite flag was not set, but file already exists on target machine!")
-        # Transfer the file with put
-        target_con.put(local_path, dest_path)  # Might throw permission error if attempt to transfer folder is made
-        target_con.run('chmod {perm} {path}'.format(perm=permissions, path=dest_path))
+        if not overwrite:  # We need to check if file exists already on target
+            file_list = execute(target_con, command='find {} -maxdepth 1 -type f'.format(dest_path), sudo=True)
+            if dest_path in file_list.stdout.split():  # Find command has found a file
+                raise FileExistsError("Overwrite flag was not set, but file already exists on target machine!")
+        if sudo:  # Invoke a special function if we want to put the file as root
+            sudo_put_file(target_con, local_path, dest_path, permissions=permissions)
+        else:
+            # Transfer the file with put
+            target_con.put(local_path, dest_path)  # Might throw permission error if attempt to transfer folder is made
+            target_con.run('chmod {perm} {path}'.format(perm=permissions, path=dest_path))
+
     except (FileNotFoundError, FileExistsError) as e:  # General error raised if transfer fails
         logging.exception("File related error occurred while transferring {}\nReason: {}".format(local_path, e))
     except OSError:
         logging.exception(
             "OSError occured while transferring {}. Most likely a try to transmit a folder was done".format(local_path))
-    else:
+    except invoke.UnexpectedExit:
+        logging.exception("Error while executing find command in put_file. Check previous exception",
+                          exc_info=False)
+    else:  # If no exceptions are caught
         return dest_path
 
-    return ""  # When an exception is caught
+    return ""  # When an exception is caught, the else in try: else: is not executed
 
 
 def get_default_configs(target_con: fabric.Connection, dest_path: str, type: str, *, overwrite: bool = False) -> None:
@@ -221,8 +250,9 @@ def main():
     # Define necessary connection information
     ip_addr = ["192.168.0.105"]
     key_path_all = r"C:\Users\batru\Desktop\Keys\private_clean_ubuntu_20_clone"
-    c = connect(ip_addr[0], username="root", key_path=key_path_all)
-    get_file(c, "/root/install_ueransim", folder_mode=True)
+    c = connect(ip_addr[0], username="open5gs", key_path=key_path_all)
+    put_file(c, "./transfers/all_open5gs/amf.yaml", "/root/test_file.yaml", permissions="444", overwrite=False, sudo=True)
+    # get_file(c, "/root/install_ueransim", folder_mode=True)
     # execute(c, command="echo $SHELL", sudo=False)
     # install_open5gs(c)
     # "transfers/some_folder/amf_realconfig_test.yaml"
@@ -231,7 +261,7 @@ def main():
     #     print("File not transferred. Check log")
     # else:
     #     print("File transferred to {}".format(dest_path))
-    put_file(c, "./transfers/all_open5gs/amf.yaml", "/etc/open5gs/amf.yaml", permissions="644", overwrite=False)
+    # put_file(c, "./transfers/all_open5gs/amf.yaml", "/etc/open5gs/amf.yaml", permissions="644", overwrite=False)
     # get_file(c, remote_path="/etc/open5gs/amf.yaml", dest_path="/some_folder", folder_mode=False)
     # transfer_configs(c, "/all_UERANSIM/", "UERANSIM")
 
