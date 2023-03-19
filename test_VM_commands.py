@@ -12,6 +12,7 @@ def connect(ip_addr: str, *, username: str, key_path: str) -> fabric.Connection:
     :param username: str
     :param key_path: str
     :return: fabric.Connection
+    :raises TimeoutError: if fabric.Connection connect_timeout is reached and connection is not established
     """
     # Initiate connection params
     c = fabric.Connection(
@@ -26,9 +27,8 @@ def connect(ip_addr: str, *, username: str, key_path: str) -> fabric.Connection:
         c.open()  # Try opening the connection specified above
         c.close()  # Will not be executed if the connection can not be made
     except TimeoutError:  # Raised by c.open() if connect_timeout is reached
-        logging.exception(f"Connection to {ip_addr} not established. Reason: timed out.")
-        exit(1)
-        # TODO - Is exit really the best behavior here?
+        logging.exception(f"Connection to {ip_addr} not established. Reason: timed out.", exc_info=False)
+        raise
     return c
 
 
@@ -151,8 +151,28 @@ def get_default_configs(target_con: fabric.Connection, dest_path: str, type: str
         if type.lower() == "open5gs":
             get_file(target_con, "/etc/open5gs/", dest_path, folder_mode=True)
         else:  # It must be UERANSIM due to earlier if statement at line 107
-            get_file(target_con, "/root/UERANSIM/config/open5gs-gnb.yaml", dest_path)
-            get_file(target_con, "/root/UERANSIM/config/open5gs-ue.yaml", dest_path)
+            get_file(target_con, "/home/open5gs/UERANSIM/config/open5gs-gnb.yaml", dest_path)
+            get_file(target_con, "/home/open5gs/UERANSIM/config/open5gs-ue.yaml", dest_path)
+
+
+def sudo_get_file(target_con: fabric.Connection, remote_path: str, dest_path: str):
+    """
+    Helper function for the get_file, sudo variant
+    Principle based on https://github.com/fabric/fabric/issues/1750
+    :param target_con: fabric.Connection
+    :param remote_path: str
+    :param dest_path: str
+    """
+    # TODO - Test this function
+    temp_file = execute(target_con, command="mktemp")
+    temp_file = temp_file.stdout.strip()  # Get the created temporary file name
+
+    # Exceptions are already handled in the called functions
+    execute(target_con, command=f"copy {remote_path} {temp_file}", sudo=True)
+    # We use get_file rather than .get to handle exceptions
+    get_file(target_con, temp_file, dest_path, folder_mode=False)
+
+    execute(target_con, command=f"rm {temp_file}", sudo=True)  # Cleanup
 
 
 # NOTE. Get method is unable to fetch files into a directory:
@@ -171,12 +191,12 @@ def get_file(target_con: fabric.connection, remote_path: str, dest_path: str = "
     :param folder_mode: bool
     :return: str
     """
-    # TODO - Handle Exceptions
+    # TODO - Try to add the sudo version without additional indent :)
     # Determine the directory contents
     try:  # If the file or folder in remote_path doesnt exist, the exception is handled in the execute function
         if folder_mode:  # We need to fetch folder contents to transfer files one by one
             # Find only files (not folders) in the specified remote_path
-            file_list = execute(target_con, command=f'find {remote_path} -maxdepth 1 -type f')
+            file_list = execute(target_con, command=f'find {remote_path} -maxdepth 1 -type f', sudo=True)
             if len(file_list.stdout) == 0:
                 raise ValueError(file_list.stderr)
             # Split each file path into different array indexes
@@ -189,7 +209,7 @@ def get_file(target_con: fabric.connection, remote_path: str, dest_path: str = "
         else:
             file_name = remote_path.split("/")[-1]
             target_con.get(remote_path, f"./transfers/{dest_path}/{file_name}")
-    except ValueError:
+    except (ValueError, OSError):
         logging.exception(f"Transfer failed: unable to fetch file list for {remote_path}")
         return
 
@@ -251,8 +271,13 @@ def init_connections(conn_dict: {str: str}) -> [fabric.Connection]:
     :return: [fabric.Connection]
     """
     c = []
+
     for ip, key_path in conn_dict.items():
-        c.append(connect(ip, username="open5gs", key_path=key_path))
+        try:
+            c.append(connect(ip, username="open5gs", key_path=key_path))
+        except TimeoutError:
+            logging.exception(f"Unable to connect to {ip}. Machine connections won't be initiated!")
+            return []
     return c
 
 
@@ -263,7 +288,6 @@ def main():
     ip_addr = ["192.168.111.105", "192.168.111.110"]
     key_path_all = r"C:\Users\batru\Desktop\Keys\private_clean_ubuntu_20_clone"
     conn_dict = {ip_addr[0]: key_path_all, ip_addr[1]: key_path_all}
-    print(conn_dict)
     c = init_connections(conn_dict)
     execute(c[0], command="ip a")
     execute(c[1], command="ip a")
