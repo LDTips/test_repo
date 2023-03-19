@@ -6,7 +6,10 @@ if [[ $EUID -ne 0 ]]; then
   exit 1
 fi
 
-if [[ -d "$HOME/UERANSIM"  ]]; then
+SRC_USERNAME=$(id -nu $SUDO_UID)
+SRC_PATH=$(eval echo "~$SRC_USERNAME")
+# $HOME should be root home dir
+if [[ -d "$HOME/UERANSIM" ]] || [[ -d "$SRC_PATH/UERANSIM" ]]; then
   echo "UERANSIM is most likely installed. UERANSIM folder exists at home dir. Installation cancelled" 1>&2
   exit 2
 fi
@@ -17,11 +20,11 @@ apt-get install build-essential libsctp-dev lksctp-tools iproute2 g++ gcc -y
 snap install cmake --classic
 
 # Fetch UERANSIM files
-cd ~ || exit
+cd "$SRC_PATH" || exit
 git clone https://github.com/aligungr/UERANSIM
 
 # Build UERANSIM. Note: takes some time. Recommended to make some coffee or tea in the meantime
-cd ~/UERANSIM || exit
+cd "$SRC_PATH/UERANSIM" || exit
 make
 
 # Change hostname and hosts file
