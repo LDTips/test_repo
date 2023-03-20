@@ -35,6 +35,8 @@ def write_yaml(file_path: str, yaml_data: dict, *, overwrite: bool = False) -> N
     try:
         if os.path.exists(file_path) and not overwrite:
             raise FileExistsError("Overwrite file was not set, but file {} exists!".format(file_path))
+        # exist_ok=false raises FileExistsError if folder exists, which is undesired if we write multiple files
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)  # Create a folder if it does not exist
         with open(file_path, 'w') as output:
             # Output compared with https://www.yamldiff.com/ - It is semantically the same
             yaml.dump(yaml_data, output, default_flow_style=False)
@@ -111,7 +113,7 @@ def test_smf(advanced: bool = False):
     # https://github.com/s5uishida/open5gs_5gc_ueransim_nearby_upf_sample_config#changes-in-configuration-files-of-open5gs-5gc-c-plane
     if advanced:
         test_dict.update({'smf-info0-s_nssai': [{"sst": 1, "dnn": ["internet"]}],
-                      'smf-info0-tai': [{'plmn_id': {'mcc': '001', 'mnc': '01'}, 'tac': 2}]})
+                          'smf-info0-tai': [{'plmn_id': {'mcc': '001', 'mnc': '01'}, 'tac': 2}]})
         yaml_data1['smf']['info'] = list()  # Needs to be created manually
 
     new_yaml_data = modify_yaml(yaml_data1, test_dict)
