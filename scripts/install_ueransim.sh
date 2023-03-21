@@ -15,6 +15,7 @@ if [[ -d "$HOME/UERANSIM" ]] || [[ -d "$SRC_PATH/UERANSIM" ]]; then
 fi
 
 # Fetch dependencies
+apt-get install dialog apt-utils -y  # Required to not encounter "tty required" error
 apt-get update
 apt-get install build-essential libsctp-dev lksctp-tools iproute2 g++ gcc -y
 snap install cmake --classic
@@ -22,7 +23,7 @@ snap install cmake --classic
 # Fetch UERANSIM files
 cd "$SRC_PATH" || exit
 git clone https://github.com/aligungr/UERANSIM
-
+chown "$SRC_USERNAME:$SRC_USERNAME" ./UERANSIM/  # Git clone was made as root, so we need to change ownership
 # Build UERANSIM. Note: takes some time. Recommended to make some coffee or tea in the meantime
 cd "$SRC_PATH/UERANSIM" || exit
 make
