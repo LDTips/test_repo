@@ -1,25 +1,11 @@
+import fabric
 import test_VM_commands as vm
 import yaml_processing as config
 import logging
-import time
+from datetime import datetime
 
 
-def main():
-    logging.basicConfig(filename="driver_script.log", level=logging.INFO)
-    # Define connection information
-    ip_addr = ["192.168.111.105", "192.168.111.110"]
-    key_path_all = r"C:\Users\batru\Desktop\Keys\private_clean_ubuntu_20_clone"
-    conn_dict = {ip_addr[0]: key_path_all, ip_addr[1]: key_path_all}
-    # Initialise connections to the machines
-    c = vm.init_connections(conn_dict)
-    if len(c) == 0:
-        print("Connections were not initialised properly!")
-        exit(1)
-    # TODO - Test everything below
-    # Run install scripts
-    # vm.install_sim(c[0], "open5gs")
-    # vm.install_sim(c[1], "ueransim")
-    # time.sleep(30)
+def update_configs(c: [fabric.Connection], ip_addr: [str]) -> None:
     # Perform config file modification - Open5gs
     # Read default configs
     upf = config.read_yaml("./transfers/all_open5gs/upf.yaml")
@@ -68,25 +54,49 @@ def main():
         overwrite=True,
         sudo=True
     )
-    vm.execute(c[0], command="systemctl restart upfd")
-    vm.execute(c[0], command="systemctl restart amfd")
+    vm.execute(c[0], command="systemctl restart open5gs-upfd", sudo=True)
+    vm.execute(c[0], command="systemctl restart open5gs-amfd", sudo=True)
     # Transfer new configs - UERANSIM
     vm.put_file(
-        c[0],
-        "./transfers/all_UERANSIM/open5gs-gnb.yaml",
-        f"/home/{c[0].user}/UERANSIM/configs/open5gs-gnb.yaml",
+        c[1],
+        "./transfers/basic_test/open5gs-gnb.yaml",
+        f"/home/{c[1].user}/UERANSIM/config/open5gs-gnb.yaml",
         permissions="644",
         overwrite=True,
         sudo=False
     )
     vm.put_file(
-        c[0],
-        "./transfers/all_UERANSIM/open5gs-ue.yaml",
-        f"/home/{c[0].user}/UERANSIM/configs/open5gs-ue.yaml",
+        c[1],
+        "./transfers/basic_test/open5gs-ue.yaml",
+        f"/home/{c[1].user}/UERANSIM/config/open5gs-ue.yaml",
         permissions="644",
         overwrite=True,
         sudo=False
     )
+
+
+def main():
+    logging.basicConfig(filename="driver_script.log", level=logging.INFO)
+    logging.info("\n--------------------------------------\n"
+                 "Start log {}"
+                 "\n--------------------------------------"
+                 .format(datetime.now()))
+    # Define connection information
+    ip_addr = ["192.168.111.105", "192.168.111.110"]
+    key_path_all = r"C:\Users\batru\Desktop\Keys\private_clean_ubuntu_20_clone"
+    conn_dict = {ip_addr[0]: key_path_all, ip_addr[1]: key_path_all}
+    # conn_dict = {"192.168.111.101": key_path_all}
+    # Initialise connections to the machines
+    c = vm.init_connections(conn_dict, username="open5gs")
+    if len(c) == 0:
+        print("Connections were not initialised properly!")
+        exit(1)
+    # TODO - Test everything below
+    # Run install scripts
+    # vm.install_sim(c[0], "open5gs")
+    # vm.install_sim(c[1], "ueransim")
+    # time.sleep(30)
+    update_configs(c, ip_addr)
 
 
 if __name__ == "__main__":

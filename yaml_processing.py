@@ -37,9 +37,9 @@ def write_yaml(file_path: str, yaml_data: dict, *, overwrite: bool = False) -> N
             raise FileExistsError("Overwrite file was not set, but file {} exists!".format(file_path))
         # exist_ok=false raises FileExistsError if folder exists, which is undesired if we write multiple files
         os.makedirs(os.path.dirname(file_path), exist_ok=True)  # Create a folder if it does not exist
-        with open(file_path, 'w') as output:
+        with open(file_path, 'w', newline='\n') as output:
             # Output compared with https://www.yamldiff.com/ - It is semantically the same
-            yaml.dump(yaml_data, output, default_flow_style=False)
+            yaml.dump(yaml_data, output, default_flow_style=False, line_break=b'\n')
     except FileExistsError as e:
         logging.exception(e)
 
@@ -56,14 +56,12 @@ def modify_dict(key: list[str], diff_dict: dict, new_value: int | str) -> dict:
                 diff_dict[key[0][:-1]][int(key[0][-1])] = new_value
 
         if len(key) == 2:
-            print("Fired for {}".format(key))
             diff_dict[key[0]][0][key[1]] = new_value
 
         elif len(key) == 3:
             # Last char of key[1] is the array index, hence we do slicing to get key name, and key[-1] to get arr index
             if (len(diff_dict[key[0]][key[1][:-1]]) - 1) < int(key[1][-1]):  # To avoid access of bad index
                 diff_dict[key[0]][key[1][:-1]].append(dict())
-            print("diff_dict[{}][{}][{}][{}]".format(key[0], key[1][:-1], int(key[1][-1]), key[2]))
             diff_dict[key[0]][key[1][:-1]][int(key[1][-1])][key[2]] = new_value
 
         elif len(key) == 4:

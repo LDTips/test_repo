@@ -2,6 +2,7 @@ import fabric
 import logging
 import invoke
 import os
+from datetime import datetime
 
 
 def connect(ip_addr: str, *, username: str, key_path: str) -> fabric.Connection:
@@ -116,7 +117,8 @@ def put_file(target_con: fabric.Connection, local_path: str, dest_path: str, *,
         logging.exception(f"File related error occurred while transferring {local_path}\nReason: {e}")
     except OSError:
         logging.exception(
-            f"OSError occured while transferring {local_path}. Most likely a try to transmit a folder was done")
+            f"OSError occured while transferring {local_path} to {dest_path}.\n"
+            f"Most likely a try to transmit a folder was done")
     except invoke.UnexpectedExit:
         logging.exception("Error while executing find command in put_file. Check previous exception",
                           exc_info=False)
@@ -264,17 +266,18 @@ def setup_end(ip_addr: str, key_path: str) -> None:
     print("icacls <private_key_path> /inheritance:r\n icacls <private_key_path> /grant:r \"%username%\":\"(R)\"")
 
 
-def init_connections(conn_dict: {str: str}) -> [fabric.Connection]:
+def init_connections(conn_dict: {str: str}, *, username: str = "open5gs") -> [fabric.Connection]:
     """
     Connects to all machines from the ip_addr:key_path dictionary
     :param conn_dict: dict
+    :param username: str
     :return: [fabric.Connection]
     """
     c = []
 
     for ip, key_path in conn_dict.items():
         try:
-            c.append(connect(ip, username="open5gs", key_path=key_path))
+            c.append(connect(ip, username=username, key_path=key_path))
         except TimeoutError:
             logging.exception(f"Unable to connect to {ip}. Machine connections won't be initiated!")
             return []
@@ -284,6 +287,10 @@ def init_connections(conn_dict: {str: str}) -> [fabric.Connection]:
 def main():
     # Driver function; testing
     logging.basicConfig(filename="test.log", level=logging.INFO)
+    logging.info("\n--------------------------------------\n"
+                 "Start log {}"
+                 "\n--------------------------------------"
+                 .format(datetime.now()))
     # Define necessary connection information
     ip_addr = ["192.168.111.105", "192.168.111.110"]
     key_path_all = r"C:\Users\batru\Desktop\Keys\private_clean_ubuntu_20_clone"
