@@ -11,6 +11,8 @@ if [[ -f "/bin/open5gs-amfd" ]]; then
 fi
 
 # Fetching dependency for open5gs and adding repository
+apt-get update
+apt-get install dialog apt-utils -y  # Required to not encounter "tty required" error
 apt-get install software-properties-common -y
 add-apt-repository ppa:open5gs/latest -y
 
