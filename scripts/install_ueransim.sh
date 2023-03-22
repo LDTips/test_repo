@@ -1,6 +1,14 @@
 #!/bin/bash
 # Tested once. Works. Requires some more extensive testing
 # This script is less complex than open5gs
+err_handler () {  # Executes if ERR signal is caught
+  echo -n "ERR: Invalid exit code $? for command: "
+  sed "$1!d" "$0"  # equivalent to awk "NR=$1" "$0"
+  exit 4
+}
+
+trap 'err_handler $LINENO 1>&2' ERR  # Listen for invalid exit codes
+
 if [[ $EUID -ne 0 ]]; then
   echo "Root privileges needed" 1>&2
   exit 1
