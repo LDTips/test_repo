@@ -54,6 +54,7 @@ def update_configs(c: [fabric.Connection], ip_addr: [str]) -> None:
         overwrite=True,
         sudo=True
     )
+    # Restart daemons to update the configuration
     vm.execute(c[0], command="systemctl restart open5gs-upfd", sudo=True)
     vm.execute(c[0], command="systemctl restart open5gs-amfd", sudo=True)
     # Transfer new configs - UERANSIM

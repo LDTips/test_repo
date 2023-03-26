@@ -106,6 +106,7 @@ def put_file(target_con: fabric.Connection, local_path: str, dest_path: str, *,
             file_list = execute(target_con, command=f'find {dest_path} -maxdepth 1 -type f', sudo=True)
             if dest_path in file_list.stdout.split():  # Find command has found a file
                 raise FileExistsError("Overwrite flag was not set, but file already exists on target machine!")
+
         if sudo:  # Invoke a special function if we want to put the file as root
             sudo_put_file(target_con, local_path, dest_path, permissions=permissions)
         else:
@@ -128,7 +129,7 @@ def put_file(target_con: fabric.Connection, local_path: str, dest_path: str, *,
     return ""  # When an exception is caught, the else in try: else: is not executed
 
 
-def get_default_configs(target_con: fabric.Connection, dest_path: str, type: str, *, overwrite: bool = False) -> None:
+def get_default_configs(target_con: fabric.Connection, dest_path: str, mode: str, *, overwrite: bool = False) -> None:
     """
     Transfers all yaml files of open5gs from the machine specified in the target con to the dest_path
     If overwrite flag is set, the function will overwrite existing files in the path
@@ -137,20 +138,20 @@ def get_default_configs(target_con: fabric.Connection, dest_path: str, type: str
     Might be enough for config file modifications
     :param target_con: fabric.Connection
     :param dest_path: str
-    :param type: str
+    :param mode: str
     :param overwrite: bool
     :return: None
     """
     try:
         if os.path.exists(dest_path) and not overwrite:
             raise FileExistsError(f"Overwrite flag was not set, but files exist in {dest_path}")
-        if type.lower() not in ("open5gs", "ueransim"):
+        if mode.lower() not in ("open5gs", "ueransim"):
             raise ValueError("Invalid type variable passed. Should be open5gs or ueransim")
     except (FileExistsError, ValueError) as e:
         logging.exception(e)
         return
     else:
-        if type.lower() == "open5gs":
+        if mode.lower() == "open5gs":
             get_file(target_con, "/etc/open5gs/", dest_path, folder_mode=True)
         else:  # It must be UERANSIM due to earlier if statement at line 107
             get_file(target_con, "/home/open5gs/UERANSIM/config/open5gs-gnb.yaml", dest_path)
@@ -170,9 +171,10 @@ def sudo_get_file(target_con: fabric.Connection, remote_path: str, dest_path: st
     temp_file = temp_file.stdout.strip()  # Get the created temporary file name
 
     # Exceptions are already handled in the called functions
-    execute(target_con, command=f"copy {remote_path} {temp_file}", sudo=True)
+    execute(target_con, command=f"cp {remote_path} {temp_file}", sudo=True)
     # We use get_file rather than .get to handle exceptions
-    get_file(target_con, temp_file, dest_path, folder_mode=False)
+    # get_file(target_con, temp_file, dest_path, folder_mode=False)
+    target_con.get(temp_file, dest_path)
 
     execute(target_con, command=f"rm {temp_file}", sudo=True)  # Cleanup
 
@@ -182,7 +184,7 @@ def sudo_get_file(target_con: fabric.Connection, remote_path: str, dest_path: st
 # target_con.get(remote_path, "./")  # when remote_path is /etc/open5gs/ does not work, because:
 # PermissionError: [Errno 13] Permission denied: 'C:\\Users\\batru\\Desktop\\system_commands_testing\\configs'
 def get_file(target_con: fabric.connection, remote_path: str, dest_path: str = "", *,
-             folder_mode: bool = False) -> None:
+             folder_mode: bool = False, sudo: bool = False) -> None:
     """
     Transfers file from remote machine specified in target_con, to local filesystem.
     If folder_mode is true, it will attempt to transfer whole folder
@@ -191,9 +193,9 @@ def get_file(target_con: fabric.connection, remote_path: str, dest_path: str = "
     :param remote_path: str
     :param dest_path: str
     :param folder_mode: bool
+    :param sudo: bool
     :return: str
     """
-    # TODO - Try to add the sudo version without additional indent :)
     # Determine the directory contents
     try:  # If the file or folder in remote_path doesnt exist, the exception is handled in the execute function
         if folder_mode:  # We need to fetch folder contents to transfer files one by one
@@ -202,15 +204,23 @@ def get_file(target_con: fabric.connection, remote_path: str, dest_path: str = "
             if len(file_list.stdout) == 0:
                 raise ValueError(file_list.stderr)
             # Split each file path into different array indexes
-            file_list = file_list.stdout.split()
+            file_paths = file_list.stdout.split()
             # Since find gives the full path, we need to extract only the file names to properly specify the destination
-            file_names = [file.split("/")[-1] for file in file_list]
-            for file_path, file_name in zip(file_list, file_names):
-                dest_folder = f"./transfers/{dest_path}/{file_name}"
-                target_con.get(file_path, dest_folder)
+            file_names = [file.split("/")[-1] for file in file_paths]
         else:
-            file_name = remote_path.split("/")[-1]
-            target_con.get(remote_path, f"./transfers/{dest_path}/{file_name}")
+            file_names = [dest_path.split("/")[-1]]  # One elem array needed due to for loop
+            file_paths = [remote_path]  # Single file_path
+            # Remove the file name from the dest_path
+            dest_path = dest_path.split("/")[:-1]  # Split by "/" and get everything except last element (file name)
+            dest_path = '/'.join(dest_path)  # Reassemble the string
+
+        for file_path, file_name in zip(file_paths, file_names):
+            dest_folder = f"./transfers/{dest_path}/{file_name}"
+            if sudo:
+                sudo_get_file(target_con, file_path, dest_folder)
+            else:
+                target_con.get(file_path, dest_folder)
+
     except (ValueError, OSError):
         logging.exception(f"Transfer failed: unable to fetch file list for {remote_path}")
         return
@@ -251,19 +261,28 @@ def install_sim(target_con: fabric.Connection, sim_name: str) -> None:
     execute(target_con, command=dest_path, sudo=True)
 
 
-def setup_end(ip_addr: str, key_path: str) -> None:
+def setup_end(machine_dict: {str: str}) -> None:
     """
     Method prints necessary information regarding user interaction with the machine
     After the setup was completed
-    :param ip_addr: str
-    :param key_path: str
+    :param machine_dict: {str:str}
     :return: None
     """
-    print("Machine at address {} has completed setup\nAccess it with the following command:")
-    print(f"ssh -i {key_path} <username>@{ip_addr}")
+    print("Virtual machines with the following IP addresses have finished setup and configuration:")
+    for ip in machine_dict.keys():
+        print(f"{ip}")
+
+    print("You can connect to them using the following command(s):")
+    for ip, key_path in machine_dict.items():
+        print(f"ssh -i {key_path} <username>@{ip}")
+
     print("Note: Key path can be relative")
-    print("Note 2: If issues arise with bad key security error from ssh command, use windows cmd commands:")
+    print("Note 2: If issues arise with bad key security error from ssh command, use windows cmd (elevated) commands:")
     print("icacls <private_key_path> /inheritance:r\n icacls <private_key_path> /grant:r \"%username%\":\"(R)\"")
+    print()
+    print("To perform some simulations, it is required build gnb and ue elements. Use the following commands:")
+    print(r"cd ~/UERANSIM\nsudo build/nr-[ue/gnb] -c config/open5gs-[ue/gnb].yaml")
+    print("It is also recommended to start tcpdump just before initialising the gnb and ue for traffic analysis")
 
 
 def init_connections(conn_dict: {str: str}, *, username: str = "open5gs") -> [fabric.Connection]:
@@ -296,17 +315,9 @@ def main():
     key_path_all = r"C:\Users\batru\Desktop\Keys\private_clean_ubuntu_20_clone"
     conn_dict = {ip_addr[0]: key_path_all, ip_addr[1]: key_path_all}
     c = init_connections(conn_dict)
-    execute(c[0], command="ip a")
-    execute(c[1], command="ip a")
-    # put_file(c, "./transfers/all_open5gs/amf.yaml", "/root/test_file.yaml", permissions="444", overwrite=False, sudo=True)
-    # get_file(c, "/root/install_ueransim", folder_mode=True)
-    # execute(c, command="echo $SHELL", sudo=False)
-    # install_open5gs(c)
-    # "transfers/some_folder/amf_realconfig_test.yaml"
-    # dest_path = transfer_file(c, "/transfers/all_open5gs/amf.yaml", "/etc/open5gs/amf.yaml", permissions="600")
-    # put_file(c, "./transfers/all_open5gs/amf.yaml", "/etc/open5gs/amf.yaml", permissions="644", overwrite=False)
-    # get_file(c, remote_path="/etc/open5gs/amf.yaml", dest_path="/some_folder", folder_mode=False)
-    # transfer_configs(c, "/all_UERANSIM/", "UERANSIM")
+
+    # get_file(c[0], "/etc/open5gs/", "open5gs_folder_test", folder_mode=True, sudo=True)
+    get_file(c[0], "/etc/open5gs/amf.yaml", "open5gs_single_test/amf_test.yaml", folder_mode=False, sudo=True)
 
 
 if __name__ == "__main__":

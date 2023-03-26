@@ -1,6 +1,4 @@
 #!/bin/bash
-# Tested once. Works. Requires some more extensive testing
-# This script is less complex than open5gs
 err_handler () {  # Executes if ERR signal is caught
   echo -n "ERR: Invalid exit code $? for command: "
   sed "$1!d" "$0"  # equivalent to awk "NR=$1" "$0"
@@ -16,7 +14,6 @@ fi
 
 SRC_USERNAME=$(id -nu $SUDO_UID)
 SRC_PATH=$(eval echo "~$SRC_USERNAME")
-# $HOME should be root home dir
 if [[ -d "$HOME/UERANSIM" ]] || [[ -d "$SRC_PATH/UERANSIM" ]]; then
   echo "UERANSIM is most likely installed. UERANSIM folder exists at home dir. Installation cancelled" 1>&2
   exit 2
