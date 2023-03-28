@@ -4,6 +4,8 @@ import invoke
 import os
 from datetime import datetime
 
+import paramiko.ssh_exception
+
 
 def connect(ip_addr: str, *, username: str, key_path: str) -> fabric.Connection:
     """
@@ -16,6 +18,7 @@ def connect(ip_addr: str, *, username: str, key_path: str) -> fabric.Connection:
     :raises TimeoutError: if fabric.Connection connect_timeout is reached and connection is not established
     """
     # Initiate connection params
+    err_str = f"Connection to {ip_addr} not established. Reason: "
     c = fabric.Connection(
         host=ip_addr,
         user=username,
@@ -25,12 +28,22 @@ def connect(ip_addr: str, *, username: str, key_path: str) -> fabric.Connection:
     )
     # Check if the connection is possible
     try:
-        c.open()  # Try opening the connection specified above
-        c.close()  # Will not be executed if the connection can not be made
-    except TimeoutError:  # Raised by c.open() if connect_timeout is reached
-        logging.exception(f"Connection to {ip_addr} not established. Reason: timed out.", exc_info=False)
-        raise
-    return c
+        c.open()  # Try opening the connection specified above. Will fail if connection was not established
+        c.close()
+    except TimeoutError:
+        logging.exception(err_str + "timed out", exc_info=False)
+    except FileNotFoundError:
+        logging.exception(err_str + f"key file at {key_path} does not exist", exc_info=False)
+    except ValueError:
+        logging.exception(err_str + f"invalid key format", exc_info=False)
+    # Exception below is misleading. It's raised in case the authentication fails
+    # See https://github.com/paramiko/paramiko/issues/1612
+    except paramiko.ssh_exception.SSHException:  #
+        logging.exception(err_str + "authentication failed (most likely) or invalid key format", exc_info=False)
+    else:
+        return c
+
+    raise ConnectionError
 
 
 def execute(target_con: fabric.Connection, *, command: str, sudo: bool = False) -> fabric.Result:
@@ -54,6 +67,8 @@ def execute(target_con: fabric.Connection, *, command: str, sudo: bool = False) 
             result.command = result.command[31:]  # Removes redundant "sudo -S -p [...]" before the actual command
         else:
             result = target_con.run(command, hide=True)
+        if len(result.stdout) == 0:
+            result.stdout = "<NO_OUTPUT>"
 
         logging.info(out.format(result))
     except invoke.UnexpectedExit as e:  # Details of the failed command execution are in the exception
@@ -297,9 +312,9 @@ def init_connections(conn_dict: {str: str}, *, username: str = "open5gs") -> [fa
     for ip, key_path in conn_dict.items():
         try:
             c.append(connect(ip, username=username, key_path=key_path))
-        except TimeoutError:
-            logging.exception(f"Unable to connect to {ip}. Machine connections won't be initiated!")
-            return []
+        except ConnectionError:
+            logging.exception(f"Unable to connect to machine {ip}")
+            raise
     return c
 
 
@@ -315,9 +330,9 @@ def main():
     key_path_all = r"C:\Users\batru\Desktop\Keys\private_clean_ubuntu_20_clone"
     conn_dict = {ip_addr[0]: key_path_all, ip_addr[1]: key_path_all}
     c = init_connections(conn_dict)
-
+    # execute(c[0], command="ls")
     # get_file(c[0], "/etc/open5gs/", "open5gs_folder_test", folder_mode=True, sudo=True)
-    get_file(c[0], "/etc/open5gs/amf.yaml", "open5gs_single_test/amf_test.yaml", folder_mode=False, sudo=True)
+    # get_file(c[0], "/etc/open5gs/amf.yaml", "open5gs_single_test/amf_test.yaml", folder_mode=False, sudo=True)
 
 
 if __name__ == "__main__":

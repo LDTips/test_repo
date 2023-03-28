@@ -88,11 +88,12 @@ def main():
     conn_dict = {ip_addr[0]: key_path_all, ip_addr[1]: key_path_all}
     # conn_dict = {"192.168.111.101": key_path_all}
     # Initialise connections to the machines
-    c = vm.init_connections(conn_dict, username="open5gs")
-    if len(c) == 0:
-        print("Connections were not initialised properly!")
+    c = []
+    try:
+        c = vm.init_connections(conn_dict, username="open5gs")
+    except ConnectionError:
+        logging.error("Received timeout error from init_connections. Driver script aborted!")
         exit(1)
-    # TODO - Test everything below
     # Run install scripts
     # vm.install_sim(c[0], "open5gs")
     # vm.install_sim(c[1], "ueransim")
