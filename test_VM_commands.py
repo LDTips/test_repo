@@ -3,8 +3,8 @@ import logging
 import invoke
 import os
 from datetime import datetime
-
 import paramiko.ssh_exception
+import uuid
 
 
 def connect(ip_addr: str, *, username: str, key_path: str) -> fabric.Connection:
@@ -241,6 +241,28 @@ def get_file(target_con: fabric.connection, remote_path: str, dest_path: str = "
         return
 
 
+def generate_start_script(daemons: {str: str}) -> str:
+    """
+    Method generates a script that will start necessary daemons
+    Based on the 'daemons' dictionary
+    Returned str is the path to the generated script
+    :param daemons: {str: str}
+    :return: str
+    """
+    file_name = str(uuid.uuid4()) + ".sh"  # Random file name + extension
+    py_dir = os.path.dirname(__file__)  # Get python script folder to help us get absolute path
+    absolute_script_path = os.path.join(py_dir, "generated_scripts", file_name)  # Join path elements
+    os.makedirs(os.path.dirname(absolute_script_path), exist_ok=True)  # Create a folder if it does not exist
+    try:  # f"{py_dir}\\scripts\\{file_name}.sh"
+        with open(absolute_script_path, 'w+') as script:
+            script.write(r"#!/bin/bash" + '\n')
+            script.write("echo \'I am alive\'\n")
+    except PermissionError:
+        logging.exception("Encountered permission error when trying to create a script!")
+    else:
+        return file_name
+
+
 def install_sim(target_con: fabric.Connection, sim_name: str) -> None:
     """
     Does necessary file transfers and commands executions to install Open5Gs or UERANSIM
@@ -326,10 +348,11 @@ def main():
                  "\n--------------------------------------"
                  .format(datetime.now()))
     # Define necessary connection information
-    ip_addr = ["192.168.111.105", "192.168.111.110"]
-    key_path_all = r"C:\Users\batru\Desktop\Keys\private_clean_ubuntu_20_clone"
-    conn_dict = {ip_addr[0]: key_path_all, ip_addr[1]: key_path_all}
-    c = init_connections(conn_dict)
+    # ip_addr = ["192.168.111.105", "192.168.111.110"]
+    # key_path_all = r"C:\Users\batru\Desktop\Keys\private_clean_ubuntu_20_clone"
+    # conn_dict = {ip_addr[0]: key_path_all, ip_addr[1]: key_path_all}
+    # c = init_connections(conn_dict)
+    generate_start_script({})
     # execute(c[0], command="ls")
     # get_file(c[0], "/etc/open5gs/", "open5gs_folder_test", folder_mode=True, sudo=True)
     # get_file(c[0], "/etc/open5gs/amf.yaml", "open5gs_single_test/amf_test.yaml", folder_mode=False, sudo=True)
