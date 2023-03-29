@@ -61,6 +61,9 @@ apt-get install open5gs -y
 wget https://raw.githubusercontent.com/open5gs/open5gs/main/misc/db/open5gs-dbctl -O /usr/bin/open5gs-dbctl
 chmod +x /usr/bin/open5gs-dbctl
 
+# Prevent open5gs daemons autostart. We need manual starts to provide alternate configs
+# e.g. ./bin/open5gs-amfd -c /etc/open5gs/amf2.yaml &
+find /etc/systemd/system/multi-user.target.wants/ -name '*open5gs*' -delete
 # Change hostname and hosts file
 echo "open5gs" > /etc/hostname
 sed -i '2i 127.0.1.1 open5gs' /etc/hosts # 2i - insert at 2nd line

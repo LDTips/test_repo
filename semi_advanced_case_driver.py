@@ -38,7 +38,7 @@ def main():
     vm.install_sim(c[1], "open5gs")
     vm.install_sim(c[2], "open5gs")
     vm.install_sim(c[3], "ueransim")
-    vm.install_sim(c[1], "ueransim")
+    vm.install_sim(c[4], "ueransim")
 
 
 if __name__ == "__main__":

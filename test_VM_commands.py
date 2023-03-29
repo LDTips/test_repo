@@ -241,6 +241,31 @@ def get_file(target_con: fabric.connection, remote_path: str, dest_path: str = "
         return
 
 
+def get_interface_ips(target_con: fabric.Connection) -> {str: str}:
+    """
+    Fetch ip addresses of all network interfaces on the target_con machine
+    ip a pipe awk is used, and then stdout is reformatted
+    Returned is dict {<interface_name>: <ipv4_addr>}
+    :param target_con: fabric.Connection
+    :return: {str: str}
+    """
+    #                                     ip a | awk '/inet / {print $2 " " $NF}'
+    result = execute(target_con, command="ip a | awk \'/inet / {print $2 \" \" $NF}\'")  # Get IP of every interface
+    interfaces = result.stdout.split("\n")[:-1]  # Split every line into separate arr element and remove trailing \n
+    # Removing unwanted interfaces from the result
+    for i in interfaces:
+        if "ogstun" not in i:  # We only want ogstun (Open5Gs related) interfaces
+            interfaces.remove(i)  # Remove non-open5gs interfaces
+
+    addr_dict = {}
+    # Extracting IP addresses and interface names into a dict
+    for i in interfaces:
+        i = i.split(" ")
+        addr_dict[i[0]] = i[1]
+
+    return addr_dict
+
+
 def generate_start_script(daemons: {str or None: str}, interfaces: fabric.Result) -> str:
     """
     Method generates a script that will start necessary daemons based on the 'daemons' dictionary
@@ -385,18 +410,6 @@ def main():
     # daemons = {'amf': None, 'upf': 'sample_upf.yaml'}
     # daemons2 = {'open5gs-gnb2.yaml': 'gnb', 'open5gs-ue1.yaml': 'ue', 'open5gs-ue2.yaml': 'ue'}
     # generate_start_script(daemons2)
-    result = execute(c[0], command="ip a | awk \'/inet / {print $2 \" \" $NF}\'")  # Get IP of every interface
-    interfaces = result.stdout.split("\n")[:-1]
-    for i in interfaces:
-        if "enp" not in i:
-            interfaces.remove(i)  # Remove non-open5gs interfaces
-    print(interfaces)
-    empty_dict = {}
-    print(interfaces[0].split(" "))
-    for i in interfaces:
-        i = i.split(" ")
-        empty_dict[i[0]] = i[1]
-    print(empty_dict)
     # execute(c[0], command="ls")
     # get_file(c[0], "/etc/open5gs/", "open5gs_folder_test", folder_mode=True, sudo=True)
     # get_file(c[0], "/etc/open5gs/amf.yaml", "open5gs_single_test/amf_test.yaml", folder_mode=False, sudo=True)
