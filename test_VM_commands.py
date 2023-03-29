@@ -241,14 +241,20 @@ def get_file(target_con: fabric.connection, remote_path: str, dest_path: str = "
         return
 
 
-def generate_start_script(daemons: {str or None: str}) -> str:
+def generate_start_script(daemons: {str or None: str}, interfaces: fabric.Result) -> str:
     """
-    Method generates a script that will start necessary daemons
-    Based on the 'daemons' dictionary
+    Method generates a script that will start necessary daemons based on the 'daemons' dictionary
     Returned str is the path to the generated script
     :param daemons: {str or None: str}
+    :param interfaces: str
     :return: str
     """
+    # subjob to get interface ips
+    interfaces = interfaces.stdout.split("\n")[:-1]
+    for i in interfaces:
+        if "ogstun" not in i:
+            interfaces.remove(i)  # Remove non-open5gs interfaces
+
     # TODO - Maybe shrink the file name to the first part of the UUID?
     file_name = str(uuid.uuid4()) + ".sh"  # Random file name + extension. uuid4 guarantees non-repeating
     py_dir = os.path.dirname(__file__)  # Get python script folder to help us get absolute path
@@ -262,9 +268,13 @@ def generate_start_script(daemons: {str or None: str}) -> str:
             script.write(r"trap 'trap - SIGTERM && kill 0' SIGINT SIGTERM" + '\n')
             # If any value in the dict matches the UERANSIM case.
             # We assume there won't be any mixes (UERANSIM and Open5gs daemons in the same dict)
+
             if any(daemon in ('gnb', 'ue') for daemon in daemons.values()):
                 script.write(r"cd ~/UERANSIM || exit 1" + '\n')
-
+            # Else, it is an open5Gs case. We also need to add some lines
+            else:
+                script.write(r"sysctl -w net.ipv4.ip_forward=1")
+                script.write(r"iptables -t nat -A POSTROUTING -s 10.45.0.0/16 ! -o ogstun -j MASQUERADE")
             for config_path, daemon in daemons.items():
                 if daemon in ('gnb', 'ue'):  # UERANSIM case
                     script.write(f"build/nr-{daemon} -c config/{config_path} &\n")
@@ -368,12 +378,25 @@ def main():
                  .format(datetime.now()))
     # Define necessary connection information
     # ip_addr = ["192.168.111.105", "192.168.111.110"]
-    # key_path_all = r"C:\Users\batru\Desktop\Keys\private_clean_ubuntu_20_clone"
-    # conn_dict = {ip_addr[0]: key_path_all, ip_addr[1]: key_path_all}
-    # c = init_connections(conn_dict)
-    daemons = {'amf': None, 'upf': 'sample_upf.yaml'}
-    daemons2 = {'open5gs-gnb2.yaml': 'gnb', 'open5gs-ue1.yaml': 'ue', 'open5gs-ue2.yaml': 'ue'}
-    generate_start_script(daemons2)
+    ip_addr = ["192.168.56.105"]
+    key_path_all = r"C:\Users\batru\Desktop\Keys\test_key"
+    conn_dict = {ip_addr[0]: key_path_all}
+    c = init_connections(conn_dict)
+    # daemons = {'amf': None, 'upf': 'sample_upf.yaml'}
+    # daemons2 = {'open5gs-gnb2.yaml': 'gnb', 'open5gs-ue1.yaml': 'ue', 'open5gs-ue2.yaml': 'ue'}
+    # generate_start_script(daemons2)
+    result = execute(c[0], command="ip a | awk \'/inet / {print $2 \" \" $NF}\'")  # Get IP of every interface
+    interfaces = result.stdout.split("\n")[:-1]
+    for i in interfaces:
+        if "enp" not in i:
+            interfaces.remove(i)  # Remove non-open5gs interfaces
+    print(interfaces)
+    empty_dict = {}
+    print(interfaces[0].split(" "))
+    for i in interfaces:
+        i = i.split(" ")
+        empty_dict[i[0]] = i[1]
+    print(empty_dict)
     # execute(c[0], command="ls")
     # get_file(c[0], "/etc/open5gs/", "open5gs_folder_test", folder_mode=True, sudo=True)
     # get_file(c[0], "/etc/open5gs/amf.yaml", "open5gs_single_test/amf_test.yaml", folder_mode=False, sudo=True)
