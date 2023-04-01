@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # A test script that writes some things to stdout.
 echo "This is a test output"

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Script is most likely operational. Fixed issue with mongod process persisting
 err_handler () {  # Executes if ERR signal is caught
   echo -n "ERR: Invalid exit code $? for command: "
