@@ -24,8 +24,8 @@ def update_configs(c: [fabric.Connection], ip_addr: [str]) -> None:
 
     # Perform config file modification - UERANSIM
     # Read default configs
-    gnb = config.read_yaml("./transfers/all_UERANSIM/open5gs-gnb.yaml")
-    ue = config.read_yaml("./transfers/all_UERANSIM/open5gs-ue.yaml")
+    gnb = config.read_yaml("transfers/all_ueransim/open5gs-gnb.yaml")
+    ue = config.read_yaml("transfers/all_ueransim/open5gs-ue.yaml")
     # Prepare modification dicts
     gnb_diff_dict = {'mcc': 999, 'mnc': 99, 'ngapIp': ip_addr[1], 'gtpIp': ip_addr[1], 'amfConfigs-address': ip_addr[0]}
     ue_diff_dict = {'supi': 'imsi-999990000000001', 'mcc': 999, 'mnc': 99}
