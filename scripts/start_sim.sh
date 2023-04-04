@@ -13,14 +13,16 @@ trap 'trap - SIGTERM && kill 0' SIGINT SIGTERM  # To avoid recursive SIGTERM cat
 declare -A worker_result
 read_stream () {
   # $1 - data stream to split
-  while IFS=$'\n' read -ra TEMP; do
-    while IFS=' ' read -ra TEMP2; do
-        if [ -z "${TEMP2[0]}" ]; then # Don't process empty lines
-          continue
-        fi
-        worker_result["${TEMP2[0]}"]="${TEMP2[1]}"
-    done <<< "${TEMP[@]}"
-done < "$1"
+  while read -r key val || [[ -n "$key" ]]; do
+    if [[ -z "$value" ]]; then
+      value="default"
+    fi
+    if [[ -n ${worker_result[${key}]} ]]; then
+      worker_result["$key"]+=":${val}"
+    else
+      worker_result["$key"]="${val}"
+    fi
+  done < "$1"
 }
 
 # Read the file
@@ -56,11 +58,14 @@ else
 
   # Start daemons
   for key in "${!worker_result[@]}"; do
-    if [[ -z "${worker_result[${key}]}" ]]; then
-      echo "/bin/open5gs-${key}d &"
-    else
-      echo "/bin/open5gs-${key}d -c ${worker_result[${key}]} &"
-    fi
+    IFS=":" read -ra split <<< "${worker_result[${key}]}"
+    for path in "${split[@]}"; do
+      if [[ "$path" == "default" ]]; then
+        echo "/bin/open5gs-${key} &"
+      else
+        echo "/bin/open5gs-${key} -c ${path} &"
+      fi
+    done
   done
   sleep 5  # Give some time for daemons and interfaces to start
 

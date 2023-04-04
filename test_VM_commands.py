@@ -6,6 +6,8 @@ from datetime import datetime
 import paramiko.ssh_exception
 import uuid
 
+OPEN5GS_ALL = ['amf', 'ausf', 'bsf', 'nrf', 'nssf', 'pcf', 'scp', 'smf', 'udm', 'udr', 'upf']
+
 
 def connect(ip_addr: str, *, username: str, key_path: str) -> fabric.Connection:
     """
