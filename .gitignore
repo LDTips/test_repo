@@ -5,3 +5,4 @@ system_commands_testing.zip
 legacy_code.*
 **/__pycache__
 **/generated_scripts
+**/generated_files

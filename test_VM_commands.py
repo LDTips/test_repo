@@ -101,7 +101,7 @@ def sudo_put_file(target_con: fabric.Connection, local_path: str, dest_path: str
 
 
 def put_file(target_con: fabric.Connection, local_path: str, dest_path: str, *,
-             permissions: str, overwrite: bool = False, sudo: bool = False) -> str:
+             permissions: str = "644", overwrite: bool = False, sudo: bool = False) -> str:
     """
     Transfers a file found at file_path to the machine specified in target_con.
     Due to harder implementation, sudo version of the method might not be implemented in the future
@@ -241,29 +241,27 @@ def get_file(target_con: fabric.connection, remote_path: str, dest_path: str = "
         return
 
 
-def get_interface_ips(target_con: fabric.Connection) -> {str: str}:
+def write_launch_config(daemons: {str: str}) -> str:
     """
-    Fetch ip addresses of all network interfaces on the target_con machine
-    ip a pipe awk is used, and then stdout is reformatted
-    Returned is dict {<interface_name>: <ipv4_addr>}
-    :param target_con: fabric.Connection
-    :return: {str: str}
+    Writes a config for simulation launch based on the passed data in daemons dict
+    Returns the path to file
+    :param daemons: {str: str}
+    :return: str
     """
-    #                                     ip a | awk '/inet / {print $2 " " $NF}'
-    result = execute(target_con, command="ip a | awk \'/inet / {print $NF \" \" $2}\'")  # Get IP of every interface
-    interfaces = result.stdout.split("\n")[:-1]  # Split every line into separate arr element and remove trailing \n
-    # Removing unwanted interfaces from the result
-    for i in interfaces:
-        if "ogstun" not in i:  # We only want ogstun (Open5Gs related) interfaces
-            interfaces.remove(i)  # Remove non-open5gs interfaces
+    file_name = str(uuid.uuid4()).split("-")[0] + ".txt"  # Random file name + extension. uuid4 guarantees non-repeating
+    py_dir = os.path.dirname(__file__)  # Get python script folder to help us get absolute path
+    absolute_script_path = os.path.join(py_dir, "generated_files", file_name)  # Join path elements
+    os.makedirs(os.path.dirname(absolute_script_path), exist_ok=True)  # Create a folder if it does not exist
 
-    addr_dict = {}
-    # Extracting IP addresses and interface names into a dict
-    for i in interfaces:
-        i = i.split(" ")
-        addr_dict[i[0]] = i[1]
-
-    return addr_dict
+    try:
+        with open(absolute_script_path, "w+") as file:
+            for k, v in daemons.items():
+                file.write(f"{k} {v}\n")
+    except PermissionError:
+        logging.exception("Encountered permission error when trying to create the file")
+        raise
+    else:
+        return absolute_script_path
 
 
 def install_sim(target_con: fabric.Connection, sim_name: str) -> None:
