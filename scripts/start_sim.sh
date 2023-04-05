@@ -14,8 +14,8 @@ declare -A worker_result
 read_stream () {
   # $1 - data stream to split
   while read -r key val || [[ -n "$key" ]]; do
-    if [[ -z "$value" ]]; then
-      value="default"
+    if [[ -z "$val" ]]; then
+      val="default"
     fi
     if [[ -n ${worker_result[${key}]} ]]; then
       worker_result["$key"]+=":${val}"
@@ -33,6 +33,7 @@ mode="Open5Gs"
 for key in "${!worker_result[@]}"; do
   if [[ "$key" == "gnb" || "$key" == "ue" ]]; then
     mode="UERANSIM"
+    break
   fi
 done
 echo "Detected $mode mode based on the provided text file $1"
@@ -71,12 +72,12 @@ else
 
   # Enable NAT and port forwards for Open5Gs related interfaces:
   echo "sudo sysctl -w net.ipv4.ip_forward=1"
-  if [[ -z "${worker_result["upf"]}" ]]; then
+  if [[ "${worker_result["upf"]}" == "default" ]]; then
     # Point to default config if it wasn't specified for the purpose getting the path in yq
     worker_result["upf"]="/etc/open5gs/upf.yaml"
   fi
   # Read from upf.subnet array fields that have addr and dev field. Print in format "addr dev" to a file
-  # This is required for NAT rules for Open5Gs tunnel interfaces
+  # This is required for NAT rules for Open5Gs tunnel interfaces. dev is the interface name for an address addr
   # File is required because of how read_stream is implemented
   yq '.upf.subnet[] | select(has("addr") and has("dev")) | .addr + " " + .dev' < "${worker_result["upf"]}" > temp_file
   unset worker_result; declare -A worker_result  # From this point worker_result will be interface, not daemon info
