@@ -3,12 +3,9 @@ The project aims to automate the deployment of virtual machines
 to run Open5gs that simulates 5G core network, and UERANSIM which simulates the radio part.
 Current status: Installation scripts implemented, transfer to remote machine implemented
 
-Next objective:
-- ~~Configuration file editing with PyYAML~~
-- Perform semi-automated setup of simple simulation scenarios
-
 ## Status
-Work in progress.
+Project abandoned.
+Ansible reimplementation In progress
 
 ## References (not final)
 Simulation scenarios (thank you s5uishida):
